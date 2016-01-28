@@ -1,5 +1,5 @@
-//! REPLACE_BY("// Copyright 2015 Claude Petit, licensed under Apache License version 2.0\n")
-// dOOdad - Object-oriented programming framework with some extras
+//! REPLACE_BY("// Copyright 2016 Claude Petit, licensed under Apache License version 2.0\n")
+// dOOdad - Object-oriented programming framework
 // File: IO_Minifiers.js - Minifiers
 // Project home: https://sourceforge.net/projects/doodad-js/
 // Trunk: svn checkout svn://svn.code.sf.net/p/doodad-js/code/trunk doodad-js-code
@@ -8,7 +8,7 @@
 // Note: I'm still in alpha-beta stage, so expect to find some bugs or incomplete parts !
 // License: Apache V2
 //
-//	Copyright 2015 Claude Petit
+//	Copyright 2016 Claude Petit
 //
 //	Licensed under the Apache License, Version 2.0 (the "License");
 //	you may not use this file except in compliance with the License.
@@ -27,7 +27,7 @@
 	var global = this;
 
 	var exports = {};
-	if (global.process) {
+	if (typeof process === 'object') {
 		module.exports = exports;
 	};
 	
@@ -35,9 +35,14 @@
 		DD_MODULES = (DD_MODULES || {});
 		DD_MODULES['Doodad.IO.Minifiers'] = {
 			type: null,
-			version: '0b',
+			version: '0.2d',
 			namespaces: null,
-			dependencies: ['Doodad.IO'],
+			dependencies: [
+				{
+					name: 'Doodad.IO',
+					version: '0.2',
+				}, 
+			],
 
 			create: function create(root, /*optional*/_options) {
 				"use strict";
@@ -74,7 +79,12 @@
 						},
 						EVAL: function(expr) {
 							if (!this.__state.remove) {
-								this.__state.buffer += tools.safeEval(expr, this.__directiveValues);
+								this.__state.injectedCode += String(tools.safeEval(expr, this.__directiveValues));
+							};
+						},
+						TO_SOURCE: function(expr) {
+							if (!this.__state.remove) {
+								this.__state.injectedCode += String(types.toSource(tools.safeEval(expr, this.__directiveValues)));
 							};
 						},
 						IF_EVAL: function(expr) {
@@ -136,13 +146,13 @@
 							};
 							this.__state.remove = false;
 						},
-						BEGIN_REMOVE: function(str) {
+						BEGIN_REMOVE: function() {
 							if (this.__state.isIfBlock) {
 								throw new types.Error("Invalid 'BEGIN_REMOVE' directive.");
 							};
 							this.__state.remove = true;
 						},
-						END_REMOVE: function(str) {
+						END_REMOVE: function() {
 							if (!this.__state.remove || this.__state.isIfBlock) {
 								throw new types.Error("Invalid 'END_REMOVE' directive.");
 							};
@@ -156,6 +166,8 @@
 						
 						this.prepareDirectives();
 						
+						types.getDefault(this.options, 'runDirectives', false);
+
 						this.reset();
 					}),
 					
@@ -186,6 +198,8 @@
 							
 							isFor: false,
 							level: 0,
+							
+							injectedCode: '',
 						};
 					}),
 					
@@ -204,6 +218,10 @@
 						this._super();
 					}),
 
+					isListening: doodad.OVERRIDE(function() {
+						return this.__listening;
+					}),
+					
 					listen: doodad.OVERRIDE(function(/*optional*/options) {
 						this.__listening = true;
 					}),
@@ -213,7 +231,21 @@
 					}),
 
 					read: doodad.OVERRIDE(function(/*optional*/options) {
-						return this.__buffer.shift();
+						if (root.DD_ASSERT) {
+							root.DD_ASSERT(types.isNothing(options) || types.isObject(options), "Invalid options.");
+						};
+						
+						var count = types.get(options, 'count');
+
+						if (root.DD_ASSERT) {
+							root.DD_ASSERT(types.isNothing(count) || types.isInteger(count), "Invalid count.");
+						};
+
+						if (types.isNothing(count)) {
+							return this.__buffer.shift();
+						} else {
+							return this.__buffer.splice(0, count);
+						};
 					}),
 					
 					getCount: doodad.OVERRIDE(function(/*optional*/options) {
@@ -230,12 +262,7 @@
 					}),
 					
 					runDirective: doodad.PUBLIC(function runDirective(directive) {
-						//try {
-							tools.safeEval(directive, this.__preparedDirectives);
-						//} catch(ex) {
-						//	console.log(directive);
-						//	throw ex;
-						//};
+						tools.safeEval(directive, this.__preparedDirectives);
 					}),
 					
 					define: doodad.PUBLIC(function define(name, value) {
@@ -249,13 +276,14 @@
 					write: doodad.OVERRIDE(function write(code, /*optional*/options) {
 						// TODO: "String templates"
 						// TODO: Minify variable names (don't forget "set" which is by scope)
-						var ev = new doodad.Event({
+						
+						var data = {
 							raw: code,
 							options: options,
-						});
-						this.onWrite(ev);
-
-						code = ev.data.raw;
+						};
+						data = this.transform(data) || data;
+						
+						this.onWrite(new doodad.Event(data));
 						
 						var state = this.__state;
 
@@ -265,354 +293,414 @@
 								state.level = 0;
 							};
 							if (!state.remove) {
-								state.buffer += state.token + state.sep;
+								if (noSep) {
+									state.buffer += state.token;
+								} else {
+									state.buffer += state.token + state.sep;
+								};
 							};
-							state.sep = '';
+							if (!noSep) {
+								state.sep = '';
+							};
 							state.token = '';
 							state.isToken = false;
 						};
-
-						if (code === io.EOF) {
-							writeToken();
-							this.__clearState();
-							if (this.__listening) {
-								var data = {
-									raw: io.EOF,
-									text: '',
-									options: options,
-								},
-								ev = new doodad.Event(data);
-								this.onReady(ev);
-								if (!ev.prevent) {
-									this.stopListening();
-								};
-							};
-						} else {
-							code = state.prevChr + code;
-							state.prevChr = '';
-							analyseChunk: while (code) {
-								if (state.isDirective || state.isDirectiveBlock) {
-									var i = 0;
-									nextCharDirective: while (i < code.length) {
-										var chr = code[i];
-										if (state.isDirectiveBlock && ((state.prevChr + chr) === '*/')) {
+						
+						code = state.prevChr + data.valueOf();
+						state.prevChr = '';
+						analyseChunk: while (code) {
+							if (state.isDirective || state.isDirectiveBlock) {
+								var i = 0;
+								nextCharDirective: while (i < code.length) {
+									var chr = code[i];
+									if (state.isDirectiveBlock && ((state.prevChr + chr) === '*/')) {
+										if (state.directive.replace(/\t/g, ' ').trim()) {
+											this.runDirective(state.directive);
+										};
+										state.prevChr = '';
+										state.isDirectiveBlock = false;
+										state.isDirective = false;
+										state.directive = '';
+										code = state.injectedCode + code.slice(i + 1);
+										state.injectedCode = '';
+										continue analyseChunk;
+									} else if (state.prevChr) { // '*'
+										state.directive += state.prevChr;
+										state.prevChr = '';
+										continue nextCharDirective;
+									} else if (state.isDirectiveBlock && (chr === '*')) {
+										// Wait next char
+										state.prevChr = chr;
+									} else if ((chr === '\n') || (chr === '\r')) {
+										if (state.directive.replace(/\t/g, ' ').trim()) {
+											this.runDirective(state.directive);
+										};
+										state.directive = '';
+										if (!state.isDirectiveBlock) {
 											state.prevChr = '';
-											state.isDirectiveBlock = false;
 											state.isDirective = false;
-											state.directive = '';
-											code = code.slice(i + 1);
+											code = state.injectedCode + code.slice(i);
+											state.injectedCode = '';
 											continue analyseChunk;
-										} else if (state.prevChr) { // '*'
-											state.directive += state.prevChr;
-											state.prevChr = '';
-											continue nextCharDirective;
-										} else if (state.isDirectiveBlock && (chr === '*')) {
-											// Wait next char
-											state.prevChr = chr;
-										} else if ((chr === '\n') || (chr === '\r')) {
-											if (state.directive.replace(/\t/g, ' ').trim()) {
-												this.runDirective(state.directive);
+										};
+									} else {
+										state.directive += chr;
+									};
+									i++;
+								};
+								break analyseChunk;
+							} else if (state.isComment) {
+								for (var i = 0; i < code.length; i++) {
+									var chr = code[i];
+									if ((chr === '\n') || (chr === '\r')) {
+										state.isComment = false;
+										code = code.slice(i);
+										continue analyseChunk;
+									};
+								};
+								break analyseChunk;
+							} else if (state.isCommentBlock) {
+								var i = 0;
+								nextCharCommentBlock: while (i < code.length) {
+									var chr = code[i];
+									if ((state.prevChr + chr) === '*/') {
+										state.prevChr = '';
+										state.isCommentBlock = false;
+										code = code.slice(i + 1);
+										continue analyseChunk;
+									} else if (state.prevChr) { // '*'
+										state.prevChr = '';
+										continue nextCharCommentBlock;
+									} else if (chr === '*') {
+										// Wait next char
+										state.prevChr = chr;
+									};
+									i++;
+								};
+								break analyseChunk;
+							} else if (state.isString) {
+								var i = 0;
+								for (; i < code.length; i++) {
+									var chr = code[i];
+									if (state.isEscaped) {
+										state.isEscaped = false;
+									} else if (chr === '\\') {
+										state.isEscaped = true;
+									} else if (chr === state.stringChr) {
+										state.isString = false;
+										if (!state.remove) {
+											state.buffer += code.slice(0, i + 1);
+										};
+										code = code.slice(i + 1);
+										continue analyseChunk;
+									};
+								};
+								if (i >= code.length) {
+									if (!state.remove) {
+										state.buffer += code;
+									};
+								};
+								break analyseChunk;
+							} else if (state.isRegExp) {
+								var i = 0;
+								for (; i < code.length; i++) {
+									var chr = code[i],
+										lowerChrAscii = chr.toLowerCase().charCodeAt(0);
+									if (state.isEscaped) {
+										state.isEscaped = false;
+									} else if (chr === '\\') {
+										state.isEscaped = true;
+									} else if (state.isCharSequence) {
+										if (chr === ']') {
+											state.isCharSequence = false;
+										};
+									} else if (state.isRegExpEnd) {
+										if ((lowerChrAscii < 97) || (lowerChrAscii > 122)) { // "a", "z"
+											state.isRegExpEnd = false;
+											state.isRegExp = false;
+											if (!state.remove) {
+												state.buffer += code.slice(0, i);
 											};
-											state.directive = '';
-											if (!state.isDirectiveBlock) {
-												state.prevChr = '';
-												state.isDirective = false;
-												code = code.slice(i);
-												continue analyseChunk;
-											};
+											code = code.slice(i);
+											continue analyseChunk;
+										};
+									} else if (chr === '[') {
+										state.isCharSequence = true;
+									} else if (chr === '/') {
+										state.isRegExpEnd = true;
+									};
+								};
+								if (i >= code.length) {
+									if (!state.remove) {
+										state.buffer += code;
+									};
+								};
+								break analyseChunk;
+							} else if (state.isTemplate) {
+								throw new types.NotSupported("String templates not supported.");
+							} else {
+								var i = 0;
+								nextChar: while (i < code.length) {
+									var chr = code[i],
+										ascii = chr.charCodeAt(0);
+									if (((state.prevChr + chr) === '//') || ((state.prevChr + chr) === '/*')) {
+										// Wait for the next char
+										state.prevChr += chr;
+										i++;
+										continue nextChar;
+									} else if (this.options.runDirectives && (((state.prevChr + chr) === '//!') || ((state.prevChr + chr) === '/*!'))) {
+										writeToken(true);
+										if ((state.prevChr + chr) === '/*!') {
+											state.isDirectiveBlock = true;
 										} else {
-											state.directive += chr;
+											state.isDirective = true;
 										};
-										i++;
-									};
-									break analyseChunk;
-								} else if (state.isComment) {
-									for (var i = 0; i < code.length; i++) {
-										var chr = code[i];
-										if ((chr === '\n') || (chr === '\r')) {
-											state.isComment = false;
-											code = code.slice(i);
-											continue analyseChunk;
-										};
-									};
-									break analyseChunk;
-								} else if (state.isCommentBlock) {
-									var i = 0;
-									nextCharCommentBlock: while (i < code.length) {
-										var chr = code[i];
-										if ((state.prevChr + chr) === '*/') {
-											state.prevChr = '';
-											state.isCommentBlock = false;
-											code = code.slice(i + 1);
-											continue analyseChunk;
-										} else if (state.prevChr) { // '*'
-											state.prevChr = '';
-											continue nextCharCommentBlock;
-										} else if (chr === '*') {
-											// Wait next char
-											state.prevChr = chr;
-										};
-										i++;
-									};
-									break analyseChunk;
-								} else if (state.isString) {
-									var i = 0;
-									for (; i < code.length; i++) {
-										var chr = code[i];
-										if (state.isEscaped) {
-											state.isEscaped = false;
-										} else if (chr === '\\') {
-											state.isEscaped = true;
-										} else if (chr === state.stringChr) {
-											state.isString = false;
-											if (!state.remove) {
-												state.buffer += code.slice(0, i + 1);
-											};
-											code = code.slice(i + 1);
-											continue analyseChunk;
-										};
-									};
-									if (i >= code.length) {
+										state.prevChr = '';
+										state.ignoreRegExp = false;
+										state.ignoreSep = true;
+										state.directive = '';
+										code = code.slice(i + 1);
+										continue analyseChunk;
+									} else if ((state.prevChr + chr).slice(0, 2) === '//') {
+										writeToken(true);
+										state.prevChr = '';
+										state.ignoreRegExp = false;
+										state.ignoreSep = true;
+										state.isComment = true;
+										code = code.slice(i);
+										continue analyseChunk;
+									} else if ((state.prevChr + chr).slice(0, 2) === '/*') {
+										writeToken(true);
+										state.prevChr = '';
+										state.ignoreRegExp = false;
+										state.ignoreSep = true;
+										state.isCommentBlock = true;
+										code = code.slice(i);
+										continue analyseChunk;
+									} else if (!state.token && !state.ignoreRegExp && (state.prevChr === '/')) {
+										writeToken();
+										state.prevChr = '';
 										if (!state.remove) {
-											state.buffer += code;
+											state.buffer += '/' + chr;
 										};
-									};
-									break analyseChunk;
-								} else if (state.isRegExp) {
-									var i = 0;
-									for (; i < code.length; i++) {
-										var chr = code[i],
-											lowerChrAscii = chr.toLowerCase().charCodeAt(0);
-										if (state.isEscaped) {
-											state.isEscaped = false;
-										} else if (chr === '\\') {
-											state.isEscaped = true;
-										} else if (state.isCharSequence) {
-											if (chr === ']') {
-												state.isCharSequence = false;
-											};
-										} else if (state.isRegExpEnd) {
-											if ((lowerChrAscii < 97) || (lowerChrAscii > 122)) { // "a", "z"
-												state.isRegExpEnd = false;
-												state.isRegExp = false;
-												if (!state.remove) {
-													state.buffer += code.slice(0, i);
-												};
-												code = code.slice(i);
-												continue analyseChunk;
-											};
-										} else if (chr === '[') {
-											state.isCharSequence = true;
-										} else if (chr === '/') {
-											state.isRegExpEnd = true;
-										};
-									};
-									if (i >= code.length) {
+										state.isRegExp = true;
+										state.ignoreSep = false;
+										code = code.slice(i + 1);
+										continue analyseChunk;
+									} else if (((ascii === 43) || (ascii === 45)) && ((state.prevChr + chr) === (chr + chr))) { // "++", "--"
+										writeToken();
+										state.prevChr = '';
+										state.ignoreRegExp = false;
 										if (!state.remove) {
-											state.buffer += code;
+											state.buffer += (chr + chr);
 										};
-									};
-									break analyseChunk;
-								} else if (state.isTemplate) {
-									throw new types.NotSupported("String templates not supported.");
-								} else {
-									var i = 0;
-									nextChar: while (i < code.length) {
-										var chr = code[i],
-											ascii = chr.charCodeAt(0);
-										if (((state.prevChr + chr) === '//') || ((state.prevChr + chr) === '/*')) {
-											// Wait for the next char
-											state.prevChr += chr;
+									} else if (state.prevChr === '/') { // "/"
+										writeToken();
+										state.ignoreRegExp = false;
+										state.ignoreSep = true;
+										if (!state.remove) {
+											state.buffer += state.prevChr;
+										};
+										state.prevChr = '';
+										continue nextChar;
+									} else if ((state.prevChr === '+') || (state.prevChr === '-')) { // "+", "-"
+										state.sep = '';
+										writeToken();
+										state.ignoreRegExp = false;
+										state.ignoreSep = true;
+										if (!state.remove) {
+											state.buffer += state.prevChr;
+										};
+										state.prevChr = '';
+										continue nextChar;
+									} else if ((ascii === 47) || (ascii === 43) || (ascii === 45)) { // "/", "+", "-"
+										// Wait for the next char
+										state.prevChr = chr;
+										i++;
+										continue nextChar;
+									} else if ((ascii === 34) || (ascii === 39)) { // '"', "'"
+										writeToken();
+										state.ignoreRegExp = false;
+										state.ignoreSep = false;
+										state.isString = true;
+										state.stringChr = chr;
+										if (!state.remove) {
+											state.buffer += chr;
+										};
+										code = code.slice(i + 1);
+										continue analyseChunk;
+									} else if (ascii === 96) { // "`"
+										writeToken();
+										state.ignoreRegExp = false;
+										state.ignoreSep = false;
+										state.isTemplate = true;
+										if (!state.remove) {
+											state.buffer += chr;
+										};
+										code = code.slice(i + 1);
+										continue analyseChunk;
+									} else if ((ascii === 10) || (ascii === 13) || (ascii === 32) || (ascii === 9) || (ascii === 59)) { // "\n", "\r", " ", "\t", ";"
+										do {
+											if ((state.isFor && (ascii === 59) && (state.level === 1)) || (!state.ignoreSep && ((ascii === 10) || (ascii === 13) || (ascii === 59)))) { // ";", "\n", "\r", ";"
+												state.sep = ';';
+											};
 											i++;
-											continue nextChar;
-										} else if (((state.prevChr + chr) === '//!') || ((state.prevChr + chr) === '/*!')) {
-											writeToken();
-											if ((state.prevChr + chr) === '/*!') {
-												state.isDirectiveBlock = true;
-											} else {
-												state.isDirective = true;
-											};
-											state.prevChr = '';
-											state.ignoreRegExp = false;
-											state.ignoreSep = true;
-											state.directive = '';
-											code = code.slice(i + 1);
-											continue analyseChunk;
-										} else if ((state.prevChr + chr).slice(0, 2) === '//') {
-											writeToken();
-											state.prevChr = '';
-											state.ignoreRegExp = false;
-											state.ignoreSep = true;
-											state.isComment = true;
-											code = code.slice(i);
-											continue analyseChunk;
-										} else if ((state.prevChr + chr).slice(0, 2) === '/*') {
-											writeToken();
-											state.prevChr = '';
-											state.ignoreRegExp = false;
-											state.ignoreSep = true;
-											state.isCommentBlock = true;
-											code = code.slice(i);
-											continue analyseChunk;
-										} else if (!state.token && !state.ignoreRegExp && (state.prevChr === '/')) {
-											writeToken();
-											state.prevChr = '';
-											if (!state.remove) {
-												state.buffer += '/' + chr;
-											};
-											state.isRegExp = true;
-											state.ignoreSep = false;
-											code = code.slice(i + 1);
-											continue analyseChunk;
-										} else if (((ascii === 43) || (ascii === 45)) && ((state.prevChr + chr) === (chr + chr))) { // "++", "--"
-											writeToken();
-											state.prevChr = '';
-											state.ignoreRegExp = false;
-											if (!state.remove) {
-												state.buffer += (chr + chr);
-											};
-										} else if (state.prevChr === '/') { // "/"
-											writeToken();
-											state.ignoreRegExp = false;
-											state.ignoreSep = true;
-											if (!state.remove) {
-												state.buffer += state.prevChr;
-											};
-											state.prevChr = '';
-											continue nextChar;
-										} else if ((state.prevChr === '+') || (state.prevChr === '-')) { // "+", "-"
-											state.sep = '';
-											writeToken();
-											state.ignoreRegExp = false;
-											state.ignoreSep = true;
-											if (!state.remove) {
-												state.buffer += state.prevChr;
-											};
-											state.prevChr = '';
-											continue nextChar;
-										} else if ((ascii === 47) || (ascii === 43) || (ascii === 45)) { // "/", "+", "-"
-											// Wait for the next char
-											state.prevChr = chr;
-											i++;
-											continue nextChar;
-										} else if ((ascii === 34) || (ascii === 39)) { // '"', "'"
-											writeToken();
-											state.ignoreRegExp = false;
-											state.ignoreSep = false;
-											state.isString = true;
-											state.stringChr = chr;
-											if (!state.remove) {
-												state.buffer += chr;
-											};
-											code = code.slice(i + 1);
-											continue analyseChunk;
-										} else if (ascii === 96) { // "`"
-											writeToken();
-											state.ignoreRegExp = false;
-											state.ignoreSep = false;
-											state.isTemplate = true;
-											if (!state.remove) {
-												state.buffer += chr;
-											};
-											code = code.slice(i + 1);
-											continue analyseChunk;
-										} else if ((ascii === 10) || (ascii === 13) || (ascii === 32) || (ascii === 9) || (ascii === 59) || (ascii === 92)) { // "\n", "\r", " ", "\t", ";", "\\"
-											do {
-												if ((state.isFor && (ascii === 59) && (state.level === 1)) || (!state.ignoreSep && ((ascii === 10) || (ascii === 13) || (ascii === 59)))) { // ";", "\n", "\r", ";"
-													state.sep = ';';
-												};
-												i++;
+											chr = code[i];
+											if (i < code.length) {
 												chr = code[i];
-												if (i < code.length) {
-													chr = code[i];
-													ascii = chr.charCodeAt(0);
-												} else {
-													break;
-												};
-											} while ((ascii === 10) || (ascii === 13) || (ascii === 32) || (ascii === 9) || (ascii === 59) || (ascii === 92)); // "\n", "\r", " ", "\t", ";", "\\"
-											state.isToken = false;
-											continue nextChar;
-										} else if (((ascii >= 65) && (ascii <= 90)) || ((ascii >= 97) && (ascii <= 122)) || ((ascii >= 48) && (ascii <= 57)) || (ascii === 36) || (ascii === 95)) { // "A-Z", "a-z", "0-9", "$", "_"
-											if (!state.isToken) {
-												if (state.token && !state.sep && !state.ignoreSep) {
-													state.token += ' ';
-												};
-												writeToken();
+												ascii = chr.charCodeAt(0);
+											} else {
+												break;
 											};
-											state.isToken = true;
-											state.ignoreSep = false;
-											do {
-												state.token += chr;
-												i++;
-												if (i < code.length) {
-													chr = code[i];
-													ascii = chr.charCodeAt(0);
-												} else {
-													break;
-												};
-											} while (((ascii >= 65) && (ascii <= 90)) || ((ascii >= 97) && (ascii <= 122)) || ((ascii >= 48) && (ascii <= 57)) || (ascii === 36) || (ascii === 95)) // "A-Z", "a-z", "0-9", "$", "_"
-											continue nextChar;
-										} else if ((ascii === 125) || (ascii === 41) || (ascii === 93)) { // "}", ")", "]"
-											if (!state.isFor || (state.level > 1)) {
-												state.sep = '';
-											};
-											if ((ascii === 41) && state.isFor) { // ")"
-												state.level--;
-												if (state.level <= 0) {
-													state.isFor = false;
-												};
+										} while ((ascii === 10) || (ascii === 13) || (ascii === 32) || (ascii === 9) || (ascii === 59)); // "\n", "\r", " ", "\t", ";"
+										state.isToken = false;
+										continue nextChar;
+									} else if (((ascii >= 65) && (ascii <= 90)) || ((ascii >= 97) && (ascii <= 122)) || ((ascii >= 48) && (ascii <= 57)) || (ascii === 36) || (ascii === 95)) { // "A-Z", "a-z", "0-9", "$", "_"
+										if (!state.isToken) {
+											if (state.token && !state.sep && !state.ignoreSep) {
+												state.token += ' ';
 											};
 											writeToken();
-											state.ignoreRegExp = true;
-											state.ignoreSep = false;
-											if (!state.remove) {
-												state.buffer += chr;
+										};
+										state.isToken = true;
+										state.ignoreSep = false;
+										do {
+											state.token += chr;
+											i++;
+											if (i < code.length) {
+												chr = code[i];
+												ascii = chr.charCodeAt(0);
+											} else {
+												break;
 											};
-										} else { // TOKEN+OP+TOKEN : "=", "==", "===", "!=", "!==", "%", "*", "&", "^", "^=", "&=", "|", "|=", "&&", "||", "^", '<', '>', '<=', '>=', '<<', '>>', '<<=', '>>=', '>>>=', '<<<', '>>>', '.', ',', '+=', '-=', '*=', '/=', '%=', '**', '**=', "?", ":"
-												 // OP+TOKEN       : "!", "~"
-												 // "{", "(", "["
-											if ((ascii !== 33) && (ascii !== 126) && (!state.isFor || (state.level > 1))) { // "!", "~"
-												state.sep = '';
-											};
-											writeToken();
-											state.ignoreRegExp = false;
-											if ((ascii === 40) && state.isFor) { // "("
-												state.level++;
-											};
-											state.ignoreSep = true;
-											if (!state.remove) {
-												state.buffer += chr;
+										} while (((ascii >= 65) && (ascii <= 90)) || ((ascii >= 97) && (ascii <= 122)) || ((ascii >= 48) && (ascii <= 57)) || (ascii === 36) || (ascii === 95)) // "A-Z", "a-z", "0-9", "$", "_"
+										continue nextChar;
+									} else if ((ascii === 125) || (ascii === 41) || (ascii === 93)) { // "}", ")", "]"
+										if (!state.isFor || (state.level > 1)) {
+											state.sep = '';
+										};
+										if ((ascii === 41) && state.isFor) { // ")"
+											state.level--;
+											if (state.level <= 0) {
+												state.level = 0;
+												state.isFor = false;
 											};
 										};
-										i++;
+										writeToken();
+										state.ignoreRegExp = true;
+										state.ignoreSep = false;
+										if (!state.remove) {
+											state.buffer += chr;
+										};
+									} else { // TOKEN+OP+TOKEN : "=", "==", "===", "!=", "!==", "%", "*", "&", "^", "^=", "&=", "|", "|=", "&&", "||", "^", '<', '>', '<=', '>=', '<<', '>>', '<<=', '>>=', '>>>=', '<<<', '>>>', '.', ',', '+=', '-=', '*=', '/=', '%=', '**', '**=', "?", ":"
+											 // OP+TOKEN       : "!", "~"
+											 // "{", "(", "["
+										if ((ascii !== 33) && (ascii !== 126) && (!state.isFor || (state.level > 1))) { // "!", "~"
+											state.sep = '';
+										};
+										writeToken();
+										state.ignoreRegExp = false;
+										if ((ascii === 40) && state.isFor) { // "("
+											state.level++;
+										};
+										state.ignoreSep = true;
+										if (!state.remove) {
+											state.buffer += chr;
+										};
 									};
-									break analyseChunk;
+									i++;
+								};
+								break analyseChunk;
+							};
+						};
+
+						var value = data.valueOf();
+						
+						if (value === io.EOF) {
+							writeToken();
+						};
+
+						
+						// TODO: Review
+						var bufferSize = this.options.bufferSize,
+							callback = types.get(options, 'callback');
+
+						var writeEOF = function writeEOF() {
+							if (value === io.EOF) {
+								this.__clearState();
+								var newData = {
+									raw: io.EOF,
+								};
+								newData = this.transform(newData) || newData;
+								if (this.options.autoFlush) {
+									this.__buffer.push(newData.valueOf());
+									this.flush(types.extend({}, options, {
+										callback: function() {
+											if (callback) {
+												callback();
+											};
+										},
+									}));
+								} else if (this.__buffer.length < bufferSize) {
+									if (this.__listening) {
+										var ev = new doodad.Event(newData);
+										this.onReady(ev);
+										if (!ev.prevent) {
+											this.__buffer.push(newData.valueOf());
+										};
+									} else {
+										this.__buffer.push(newData.valueOf());
+									};
+									if (callback) {
+										callback();
+									};
+								} else {
+									throw new types.BufferOverflow();
+								};
+							} else {
+								if (callback) {
+									callback();
 								};
 							};
-							if (state.buffer) {
+						};
+							
+						if (state.buffer) {
+							var newData = {
+								raw: state.buffer,
+							};
+							state.buffer = '';
+							newData = this.transform(newData) || newData;
+							if (this.options.autoFlush) {
+								this.__buffer.push(newData.valueOf());
+								if (this.__buffer.length >= bufferSize) {
+									this.flush(types.extend({}, options, {
+										callback: new doodad.Callback(this, writeEOF),
+									}));
+								} else {
+									writeEOF.call(this);
+								};
+							} else if (this.__buffer.length < bufferSize) {
 								if (this.__listening) {
-									var data = {
-											raw: state.buffer,
-											text: state.buffer,
-											options: options,
-										};
-									var ev = new doodad.Event(data);
+									var ev = new doodad.Event(newData);
 									this.onReady(ev);
 									if (!ev.prevent) {
-										var bufferSize = this.options.bufferSize;
-										if (this.__buffer.length < bufferSize) {
-											this.__buffer.push(data);
-										} else {
-											throw new types.BufferOverflow();
-										};
+										this.__buffer.push(newData.valueOf());
 									};
+								} else {
+									this.__buffer.push(newData.valueOf());
 								};
-								state.buffer = '';
+								writeEOF.call(this);
+							} else {
+								throw new types.BufferOverflow();
 							};
+						} else {
+							writeEOF.call(this);
 						};
 					}),
 					
 					flush: doodad.OVERRIDE(function flush(/*optional*/options) {
+						var callback = types.get(options, 'callback');
+						
 						if (this.__listening) {
 							var data;
 							while (data = this.__buffer.shift()) {
@@ -620,11 +708,16 @@
 								this.onReady(ev);
 							};
 						} else {
-							this.__buffer = null;
+							this.__buffer = [];
 						};
+						
 						this.onFlush(new doodad.Event({
 							options: options,
 						}));
+						
+						if (callback) {
+							callback();
+						};
 					}),
 				}));
 					
@@ -638,8 +731,8 @@
 		return DD_MODULES;
 	};
 	
-	if (!global.process) {
+	if (typeof process !== 'object') {
 		// <PRB> export/import are not yet supported in browsers
 		global.DD_MODULES = exports.add(global.DD_MODULES);
 	};
-})();
+}).call((typeof global !== 'undefined') ? global : ((typeof window !== 'undefined') ? window : this));
