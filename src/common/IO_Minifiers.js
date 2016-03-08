@@ -35,12 +35,24 @@
 		DD_MODULES = (DD_MODULES || {});
 		DD_MODULES['Doodad.IO.Minifiers'] = {
 			type: null,
-			version: '0.2d',
+			version: '0.3.0d',
 			namespaces: null,
 			dependencies: [
 				{
+					name: 'Doodad.Tools.Locale',
+					version: '1.3.0',
+				}, 
+				{
+					name: 'Doodad.Tools.Unicode',
+					version: '0.1.0',
+				}, 
+				{
+					name: 'Doodad.Tools.SafeEval',
+					version: '0.1.0',
+				}, 
+				{
 					name: 'Doodad.IO',
-					version: '0.2',
+					version: '0.4.0',
 				}, 
 			],
 
@@ -51,6 +63,9 @@
 					mixIns = doodad.MixIns,
 					types = doodad.Types,
 					tools = doodad.Tools,
+					safeEval = tools.SafeEval,
+					locale = tools.Locale,
+					unicode = tools.Unicode,
 					io = doodad.IO,
 					ioMixIns = io.MixIns,
 					ioInterfaces = io.Interfaces,
@@ -58,6 +73,10 @@
 					minifiers = io.Minifiers;
 
 					
+				//var __Internal__ = {
+				//};
+				
+
 				minifiers.REGISTER(io.Stream.$extend(
 									ioMixIns.TextInput,
 									ioMixIns.TextOutput,
@@ -79,12 +98,12 @@
 						},
 						EVAL: function(expr) {
 							if (!this.__state.remove) {
-								this.__state.injectedCode += String(tools.safeEval(expr, this.__directiveValues));
+								this.__state.injectedCode += String(safeEval.eval(expr, this.__directiveValues));
 							};
 						},
 						TO_SOURCE: function(expr) {
 							if (!this.__state.remove) {
-								this.__state.injectedCode += String(types.toSource(tools.safeEval(expr, this.__directiveValues)));
+								this.__state.injectedCode += String(types.toSource(safeEval.eval(expr, this.__directiveValues)));
 							};
 						},
 						IF_EVAL: function(expr) {
@@ -92,7 +111,7 @@
 								throw new types.NotSupported("Nested 'IF' directives are not supported.");
 							};
 							this.__state.isIfBlock = true;
-							this.__state.remove = !tools.safeEval(expr, this.__directiveValues);
+							this.__state.remove = !safeEval.eval(expr, this.__directiveValues);
 						},
 						IF_DEF: function(key) {
 							if (this.__state.isIfBlock) {
@@ -189,6 +208,10 @@
 							token: '',
 							sep: '',
 							ignoreSep: true,
+							explicitSep: false,
+							isTemplateExpression: false,
+							braceLevel: 0,
+							braceLevelStack: [],
 							
 							isDirective: false,
 							isDirectiveBlock: false,
@@ -197,7 +220,7 @@
 							remove: false,
 							
 							isFor: false,
-							level: 0,
+							forLevel: 0,
 							
 							injectedCode: '',
 						};
@@ -262,7 +285,7 @@
 					}),
 					
 					runDirective: doodad.PUBLIC(function runDirective(directive) {
-						tools.safeEval(directive, this.__preparedDirectives);
+						safeEval.eval(directive, this.__preparedDirectives);
 					}),
 					
 					define: doodad.PUBLIC(function define(name, value) {
@@ -290,7 +313,7 @@
 						function writeToken(/*optional*/noSep) {
 							if (state.token.trim() === 'for') {
 								state.isFor = true;
-								state.level = 0;
+								state.forLevel = 0;
 							};
 							if (!state.remove) {
 								if (noSep) {
@@ -301,19 +324,25 @@
 							};
 							if (!noSep) {
 								state.sep = '';
+								state.explicitSep = false;
 							};
 							state.token = '';
 							state.isToken = false;
 						};
 						
+						var curLocale = locale.getCurrent();
+						
 						code = state.prevChr + data.valueOf();
 						state.prevChr = '';
 						analyseChunk: while (code) {
 							if (state.isDirective || state.isDirectiveBlock) {
-								var i = 0;
-								nextCharDirective: while (i < code.length) {
-									var chr = code[i];
-									if (state.isDirectiveBlock && ((state.prevChr + chr) === '*/')) {
+								var chr = unicode.nextChar(code);
+								nextCharDirective: while (chr) {
+									if (chr.codePoint < 0) {
+										// Incomplete Unicode sequence
+										break analyseChunk;
+									};
+									if (state.isDirectiveBlock && ((state.prevChr + chr.chr) === '*/')) {
 										if (state.directive.replace(/\t/g, ' ').trim()) {
 											this.runDirective(state.directive);
 										};
@@ -321,17 +350,17 @@
 										state.isDirectiveBlock = false;
 										state.isDirective = false;
 										state.directive = '';
-										code = state.injectedCode + code.slice(i + 1);
+										code = state.injectedCode + code.slice(chr.index + chr.size);
 										state.injectedCode = '';
 										continue analyseChunk;
 									} else if (state.prevChr) { // '*'
 										state.directive += state.prevChr;
 										state.prevChr = '';
 										continue nextCharDirective;
-									} else if (state.isDirectiveBlock && (chr === '*')) {
+									} else if (state.isDirectiveBlock && (chr.chr === '*')) {
 										// Wait next char
-										state.prevChr = chr;
-									} else if ((chr === '\n') || (chr === '\r')) {
+										state.prevChr = chr.chr;
+									} else if ((chr.chr === '\n') || (chr.chr === '\r')) {
 										if (state.directive.replace(/\t/g, ' ').trim()) {
 											this.runDirective(state.directive);
 										};
@@ -339,79 +368,122 @@
 										if (!state.isDirectiveBlock) {
 											state.prevChr = '';
 											state.isDirective = false;
-											code = state.injectedCode + code.slice(i);
+											code = state.injectedCode + code.slice(chr.index + chr.size);
 											state.injectedCode = '';
 											continue analyseChunk;
 										};
 									} else {
-										state.directive += chr;
+										state.directive += chr.chr;
 									};
-									i++;
+									chr = chr.nextChar();
 								};
 								break analyseChunk;
 							} else if (state.isComment) {
-								for (var i = 0; i < code.length; i++) {
-									var chr = code[i];
-									if ((chr === '\n') || (chr === '\r')) {
+								var chr = unicode.nextChar(code);
+								while (chr) {
+									if (chr.codePoint < 0) {
+										// Incomplete Unicode sequence
+										break analyseChunk;
+									};
+									if ((chr.chr === '\n') || (chr.chr === '\r')) {
 										state.isComment = false;
-										code = code.slice(i);
+										code = code.slice(chr.index + chr.size);
 										continue analyseChunk;
 									};
+									chr = chr.nextChar();
 								};
 								break analyseChunk;
 							} else if (state.isCommentBlock) {
-								var i = 0;
-								nextCharCommentBlock: while (i < code.length) {
-									var chr = code[i];
-									if ((state.prevChr + chr) === '*/') {
+								var chr = unicode.nextChar(code);
+								nextCharCommentBlock: while (chr) {
+									if (chr.codePoint < 0) {
+										// Incomplete Unicode sequence
+										break analyseChunk;
+									};
+									if ((state.prevChr + chr.chr) === '*/') {
 										state.prevChr = '';
 										state.isCommentBlock = false;
-										code = code.slice(i + 1);
+										code = code.slice(chr.index + chr.size);
 										continue analyseChunk;
 									} else if (state.prevChr) { // '*'
 										state.prevChr = '';
 										continue nextCharCommentBlock;
-									} else if (chr === '*') {
+									} else if (chr.chr === '*') {
 										// Wait next char
-										state.prevChr = chr;
+										state.prevChr = chr.chr;
 									};
-									i++;
+									chr = chr.nextChar();
 								};
 								break analyseChunk;
-							} else if (state.isString) {
-								var i = 0;
-								for (; i < code.length; i++) {
-									var chr = code[i];
-									if (state.isEscaped) {
-										state.isEscaped = false;
-									} else if (chr === '\\') {
-										state.isEscaped = true;
-									} else if (chr === state.stringChr) {
-										state.isString = false;
+							} else if (state.isString || state.isTemplate) {
+								var chr = unicode.nextChar(code);
+								nextChar: while (chr) {
+									if (chr.codePoint < 0) {
+										// Incomplete Unicode sequence
+										break analyseChunk;
+									};
+									if (state.isString && ((chr.chr === '\n') || (chr.chr === '\r'))) {
+										// NOTE: "new line" can be "\r\n" or "\n\r", so there is no condition on "state.isEscaped"
+										// Multi-Line String. New line is removed. It assumes new line is escaped because otherwise it is a synthax error.
+										// Exemple :
+										//     var a = "Hello \
+										//     world !"
 										if (!state.remove) {
-											state.buffer += code.slice(0, i + 1);
+											state.buffer += code.slice(0, chr.index);
 										};
-										code = code.slice(i + 1);
+										code = code.slice(chr.index + chr.size);
+										continue analyseChunk;
+									} else if (state.isEscaped) {
+										// Skip escaped character.
+										state.isEscaped = false;
+									} else if (chr.chr === '\\') {
+										// Character escape. Will skip the following character in case it is "'", '"' or "`". Other escapes ("\n", "\u...", ...) are not harmfull.
+										state.isEscaped = true;
+									} else if (state.isTemplate && ((state.prevChr + chr.chr) === '${')) {
+										state.isTemplate = false;
+										state.isTemplateExpression = true;
+										state.braceLevelStack.push(state.braceLevel);
+										state.braceLevel = 0;
+										state.ignoreSep = true;
+										if (!state.remove) {
+											state.buffer += code.slice(0, chr.index + chr.size);
+										};
+										code = code.slice(chr.index + chr.size);
+										continue analyseChunk;
+									} else if (state.isTemplate && (chr.chr === '$')) {
+										state.prevChr = chr.chr;
+									} else if (chr.chr === state.stringChr) {
+										state.isString = false;
+										state.isTemplate = false;
+										if (!state.remove) {
+											state.buffer += code.slice(0, chr.index + chr.size);
+										};
+										code = code.slice(chr.index + chr.size);
 										continue analyseChunk;
 									};
+									state.prevChr = '';
+									chr = chr.nextChar();
 								};
-								if (i >= code.length) {
+								if (!chr) {
 									if (!state.remove) {
 										state.buffer += code;
 									};
 								};
 								break analyseChunk;
 							} else if (state.isRegExp) {
-								var i = 0;
-								for (; i < code.length; i++) {
-									var chr = code[i],
-										lowerChrAscii = chr.toLowerCase().charCodeAt(0);
+								var chr = unicode.nextChar(code);
+								while (chr) {
+									if (chr.codePoint < 0) {
+										// Incomplete Unicode sequence
+										break analyseChunk;
+									};
+									var lowerChrAscii = unicode.codePointAt(chr.chr.toLowerCase(), 0)[0];
 									if (state.isEscaped) {
 										state.isEscaped = false;
-									} else if (chr === '\\') {
+									} else if (chr.chr === '\\') {
 										state.isEscaped = true;
 									} else if (state.isCharSequence) {
-										if (chr === ']') {
+										if (chr.chr === ']') {
 											state.isCharSequence = false;
 										};
 									} else if (state.isRegExpEnd) {
@@ -419,38 +491,39 @@
 											state.isRegExpEnd = false;
 											state.isRegExp = false;
 											if (!state.remove) {
-												state.buffer += code.slice(0, i);
+												state.buffer += code.slice(0, chr.index);
 											};
-											code = code.slice(i);
+											code = code.slice(chr.index);
 											continue analyseChunk;
 										};
-									} else if (chr === '[') {
+									} else if (chr.chr === '[') {
 										state.isCharSequence = true;
-									} else if (chr === '/') {
+									} else if (chr.chr === '/') {
 										state.isRegExpEnd = true;
 									};
+									chr = chr.nextChar();
 								};
-								if (i >= code.length) {
+								if (!chr) {
 									if (!state.remove) {
 										state.buffer += code;
 									};
 								};
 								break analyseChunk;
-							} else if (state.isTemplate) {
-								throw new types.NotSupported("String templates not supported.");
 							} else {
-								var i = 0;
-								nextChar: while (i < code.length) {
-									var chr = code[i],
-										ascii = chr.charCodeAt(0);
-									if (((state.prevChr + chr) === '//') || ((state.prevChr + chr) === '/*')) {
+								var chr = unicode.nextChar(code);
+								nextChar: while (chr) {
+									if (chr.codePoint < 0) {
+										// Incomplete Unicode sequence
+										break analyseChunk;
+									};
+									if (((state.prevChr + chr.chr) === '//') || ((state.prevChr + chr.chr) === '/*')) {
 										// Wait for the next char
-										state.prevChr += chr;
-										i++;
+										state.prevChr += chr.chr;
+										chr = chr.nextChar();
 										continue nextChar;
-									} else if (this.options.runDirectives && (((state.prevChr + chr) === '//!') || ((state.prevChr + chr) === '/*!'))) {
+									} else if (this.options.runDirectives && (((state.prevChr + chr.chr) === '//!') || ((state.prevChr + chr.chr) === '/*!'))) {
 										writeToken(true);
-										if ((state.prevChr + chr) === '/*!') {
+										if ((state.prevChr + chr.chr) === '/*!') {
 											state.isDirectiveBlock = true;
 										} else {
 											state.isDirective = true;
@@ -459,40 +532,40 @@
 										state.ignoreRegExp = false;
 										state.ignoreSep = true;
 										state.directive = '';
-										code = code.slice(i + 1);
+										code = code.slice(chr.index + chr.size);
 										continue analyseChunk;
-									} else if ((state.prevChr + chr).slice(0, 2) === '//') {
+									} else if ((state.prevChr + chr.chr).slice(0, 2) === '//') {
 										writeToken(true);
 										state.prevChr = '';
 										state.ignoreRegExp = false;
 										state.ignoreSep = true;
 										state.isComment = true;
-										code = code.slice(i);
+										code = code.slice(chr.index + chr.size);
 										continue analyseChunk;
-									} else if ((state.prevChr + chr).slice(0, 2) === '/*') {
+									} else if ((state.prevChr + chr.chr).slice(0, 2) === '/*') {
 										writeToken(true);
 										state.prevChr = '';
 										state.ignoreRegExp = false;
 										state.ignoreSep = true;
 										state.isCommentBlock = true;
-										code = code.slice(i);
+										code = code.slice(chr.index + chr.size);
 										continue analyseChunk;
 									} else if (!state.token && !state.ignoreRegExp && (state.prevChr === '/')) {
 										writeToken();
 										state.prevChr = '';
 										if (!state.remove) {
-											state.buffer += '/' + chr;
+											state.buffer += '/' + chr.chr;
 										};
 										state.isRegExp = true;
 										state.ignoreSep = false;
-										code = code.slice(i + 1);
+										code = code.slice(chr.index + chr.size);
 										continue analyseChunk;
-									} else if (((ascii === 43) || (ascii === 45)) && ((state.prevChr + chr) === (chr + chr))) { // "++", "--"
+									} else if (((chr.codePoint === 43) || (chr.codePoint === 45)) && ((state.prevChr + chr.chr) === (chr.chr + chr.chr))) { // "++", "--"
 										writeToken();
 										state.prevChr = '';
 										state.ignoreRegExp = false;
 										if (!state.remove) {
-											state.buffer += (chr + chr);
+											state.buffer += (chr.chr + chr.chr);
 										};
 									} else if (state.prevChr === '/') { // "/"
 										writeToken();
@@ -513,49 +586,54 @@
 										};
 										state.prevChr = '';
 										continue nextChar;
-									} else if ((ascii === 47) || (ascii === 43) || (ascii === 45)) { // "/", "+", "-"
+									} else if ((chr.codePoint === 47) || (chr.codePoint === 43) || (chr.codePoint === 45)) { // "/", "+", "-"
 										// Wait for the next char
-										state.prevChr = chr;
-										i++;
+										state.prevChr = chr.chr;
+										chr = chr.nextChar();
 										continue nextChar;
-									} else if ((ascii === 34) || (ascii === 39)) { // '"', "'"
+									} else if ((chr.codePoint === 34) || (chr.codePoint === 39)) { // '"', "'"
 										writeToken();
 										state.ignoreRegExp = false;
 										state.ignoreSep = false;
 										state.isString = true;
-										state.stringChr = chr;
+										state.stringChr = chr.chr;
 										if (!state.remove) {
-											state.buffer += chr;
+											state.buffer += chr.chr;
 										};
-										code = code.slice(i + 1);
+										code = code.slice(chr.index + chr.size);
 										continue analyseChunk;
-									} else if (ascii === 96) { // "`"
+									} else if (chr.codePoint === 96) { // "`"
 										writeToken();
 										state.ignoreRegExp = false;
 										state.ignoreSep = false;
 										state.isTemplate = true;
+										state.stringChr = chr.chr;
 										if (!state.remove) {
-											state.buffer += chr;
+											state.buffer += chr.chr;
 										};
-										code = code.slice(i + 1);
+										code = code.slice(chr.index + chr.size);
 										continue analyseChunk;
-									} else if ((ascii === 10) || (ascii === 13) || (ascii === 32) || (ascii === 9) || (ascii === 59)) { // "\n", "\r", " ", "\t", ";"
+									} else if ((chr.codePoint === 59) || unicode.isSpace(chr.chr, curLocale)) { // ";", "{space}"
 										do {
-											if ((state.isFor && (ascii === 59) && (state.level === 1)) || (!state.ignoreSep && ((ascii === 10) || (ascii === 13) || (ascii === 59)))) { // ";", "\n", "\r", ";"
+											if ((state.isFor && (chr.codePoint === 59) && (state.forLevel === 1)) || (!state.ignoreSep && ((chr.codePoint === 10) || (chr.codePoint === 13) || (chr.codePoint === 59)))) { // ";", "\n", "\r", ";"
+												if (chr.codePoint === 59) { // ";"
+													state.explicitSep = true;
+												};
 												state.sep = ';';
 											};
-											i++;
-											chr = code[i];
-											if (i < code.length) {
-												chr = code[i];
-												ascii = chr.charCodeAt(0);
+											chr = chr.nextChar();
+											if (chr) {
+												if (chr.codePoint < 0) {
+													// Incomplete Unicode sequence
+													break analyseChunk;
+												};
 											} else {
 												break;
 											};
-										} while ((ascii === 10) || (ascii === 13) || (ascii === 32) || (ascii === 9) || (ascii === 59)); // "\n", "\r", " ", "\t", ";"
+										} while ((chr.codePoint === 59) || unicode.isSpace(chr.chr, curLocale)) // ";", "{space}"
 										state.isToken = false;
 										continue nextChar;
-									} else if (((ascii >= 65) && (ascii <= 90)) || ((ascii >= 97) && (ascii <= 122)) || ((ascii >= 48) && (ascii <= 57)) || (ascii === 36) || (ascii === 95)) { // "A-Z", "a-z", "0-9", "$", "_"
+									} else if ((chr.codePoint === 36) || (chr.codePoint === 95) || unicode.isAlnum(chr.chr, curLocale)) { // "$", "_", "{alnum}"
 										if (!state.isToken) {
 											if (state.token && !state.sep && !state.ignoreSep) {
 												state.token += ' ';
@@ -565,50 +643,78 @@
 										state.isToken = true;
 										state.ignoreSep = false;
 										do {
-											state.token += chr;
-											i++;
-											if (i < code.length) {
-												chr = code[i];
-												ascii = chr.charCodeAt(0);
+											state.token += chr.chr;
+											chr = chr.nextChar();
+											if (chr) {
+												if (chr.codePoint < 0) {
+													// Incomplete Unicode sequence
+													break analyseChunk;
+												};
 											} else {
 												break;
 											};
-										} while (((ascii >= 65) && (ascii <= 90)) || ((ascii >= 97) && (ascii <= 122)) || ((ascii >= 48) && (ascii <= 57)) || (ascii === 36) || (ascii === 95)) // "A-Z", "a-z", "0-9", "$", "_"
+										} while ((chr.codePoint === 36) || (chr.codePoint === 95) || unicode.isAlnum(chr.chr, curLocale)) // "$", "_", "{alnum}"
 										continue nextChar;
-									} else if ((ascii === 125) || (ascii === 41) || (ascii === 93)) { // "}", ")", "]"
-										if (!state.isFor || (state.level > 1)) {
+									} else if ((chr.codePoint === 125) || (chr.codePoint === 41) || (chr.codePoint === 93)) { // "}", ")", "]"
+										if (!state.isFor || (state.forLevel > 1)) {
 											state.sep = '';
 										};
-										if ((ascii === 41) && state.isFor) { // ")"
-											state.level--;
-											if (state.level <= 0) {
-												state.level = 0;
+										if ((chr.codePoint === 41) && state.isFor) { // ")"
+											state.forLevel--;
+											if (state.forLevel <= 0) {
+												state.forLevel = 0;
 												state.isFor = false;
+											};
+										} else if (chr.codePoint === 125) { // "}"
+											state.braceLevel--;
+											if (state.braceLevel <= 0) {
+												if (state.isTemplateExpression) {
+													state.braceLevel = state.braceLevelStack.pop() || 0;
+													writeToken();
+													state.ignoreRegExp = false;
+													state.ignoreSep = false;
+													state.isTemplate = true;
+													state.isTemplateExpression = false;
+													state.stringChr = '`';
+													if (!state.remove) {
+														state.buffer += chr.chr;
+													};
+													code = code.slice(chr.index + chr.size);
+													continue analyseChunk;
+												} else {
+													state.braceLevel = 0;
+												};
 											};
 										};
 										writeToken();
 										state.ignoreRegExp = true;
 										state.ignoreSep = false;
 										if (!state.remove) {
-											state.buffer += chr;
+											state.buffer += chr.chr;
 										};
 									} else { // TOKEN+OP+TOKEN : "=", "==", "===", "!=", "!==", "%", "*", "&", "^", "^=", "&=", "|", "|=", "&&", "||", "^", '<', '>', '<=', '>=', '<<', '>>', '<<=', '>>=', '>>>=', '<<<', '>>>', '.', ',', '+=', '-=', '*=', '/=', '%=', '**', '**=', "?", ":"
 											 // OP+TOKEN       : "!", "~"
 											 // "{", "(", "["
-										if ((ascii !== 33) && (ascii !== 126) && (!state.isFor || (state.level > 1))) { // "!", "~"
-											state.sep = '';
+											 // ",", "."
+										if ((chr.codePoint !== 33) && (chr.codePoint !== 126) && (!state.isFor || (state.forLevel > 1))) { // "!", "~"
+											if (!state.explicitSep || ((chr.codePoint !== 123) && (chr.codePoint !== 40) && (chr.codePoint !== 91))) { // "{", "(", "["
+												state.sep = '';
+											};
 										};
+
 										writeToken();
 										state.ignoreRegExp = false;
-										if ((ascii === 40) && state.isFor) { // "("
-											state.level++;
+										if ((chr.codePoint === 40) && state.isFor) { // "("
+											state.forLevel++;
+										} else if (chr.codePoint === 123) { // "{"
+											state.braceLevel++;
 										};
 										state.ignoreSep = true;
 										if (!state.remove) {
-											state.buffer += chr;
+											state.buffer += chr.chr;
 										};
 									};
-									i++;
+									chr = chr.nextChar();
 								};
 								break analyseChunk;
 							};

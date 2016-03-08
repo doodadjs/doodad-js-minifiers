@@ -16,7 +16,7 @@ $ npm install doodad-js-minifiers
   -  Implemented as streams.
   -  Allows directives in source files (built-in and custom ones).
   -  Allows variables.
-  -  Should supports ES6/ES7 syntax as well as <= ES5 (to be validated).
+  -  Should support ES6/ES7 syntax as well as <= ES5 (to be validated).
 
 ## Quick Start
 
@@ -51,13 +51,16 @@ Then load 'doodad-js-minifiers' and its dependencies :
 ```js
     const modules = {};
     require('doodad-js-io').add(modules);
+    require('doodad-js-unicode').add(modules);
+    require('doodad-js-locale').add(modules);
+    require('doodad-js-safeeval').add(modules);
     require('doodad-js-minifiers').add(modules);
     
     function startup() {
 		// Your code here...
     };
     
-    namespaces.loadNamespaces(startup, false, null, modules);
+    namespaces.loadNamespaces(modules, startup);
 ```
 
 ## Example
