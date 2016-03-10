@@ -338,7 +338,7 @@
 							if (state.isDirective || state.isDirectiveBlock) {
 								var chr = unicode.nextChar(code);
 								nextCharDirective: while (chr) {
-									if (chr.codePoint < 0) {
+									if (!chr.complete) {
 										// Incomplete Unicode sequence
 										break analyseChunk;
 									};
@@ -381,7 +381,7 @@
 							} else if (state.isComment) {
 								var chr = unicode.nextChar(code);
 								while (chr) {
-									if (chr.codePoint < 0) {
+									if (!chr.complete) {
 										// Incomplete Unicode sequence
 										break analyseChunk;
 									};
@@ -396,7 +396,7 @@
 							} else if (state.isCommentBlock) {
 								var chr = unicode.nextChar(code);
 								nextCharCommentBlock: while (chr) {
-									if (chr.codePoint < 0) {
+									if (!chr.complete) {
 										// Incomplete Unicode sequence
 										break analyseChunk;
 									};
@@ -418,7 +418,7 @@
 							} else if (state.isString || state.isTemplate) {
 								var chr = unicode.nextChar(code);
 								nextChar: while (chr) {
-									if (chr.codePoint < 0) {
+									if (!chr.complete) {
 										// Incomplete Unicode sequence
 										break analyseChunk;
 									};
@@ -473,11 +473,10 @@
 							} else if (state.isRegExp) {
 								var chr = unicode.nextChar(code);
 								while (chr) {
-									if (chr.codePoint < 0) {
+									if (!chr.complete) {
 										// Incomplete Unicode sequence
 										break analyseChunk;
 									};
-									var lowerChrAscii = unicode.codePointAt(chr.chr.toLowerCase(), 0)[0];
 									if (state.isEscaped) {
 										state.isEscaped = false;
 									} else if (chr.chr === '\\') {
@@ -487,6 +486,8 @@
 											state.isCharSequence = false;
 										};
 									} else if (state.isRegExpEnd) {
+										// Flags
+										var lowerChrAscii = unicode.codePointAt(chr.chr.toLowerCase(), 0).codePoint;
 										if ((lowerChrAscii < 97) || (lowerChrAscii > 122)) { // "a", "z"
 											state.isRegExpEnd = false;
 											state.isRegExp = false;
@@ -512,7 +513,7 @@
 							} else {
 								var chr = unicode.nextChar(code);
 								nextChar: while (chr) {
-									if (chr.codePoint < 0) {
+									if (!chr.complete) {
 										// Incomplete Unicode sequence
 										break analyseChunk;
 									};
