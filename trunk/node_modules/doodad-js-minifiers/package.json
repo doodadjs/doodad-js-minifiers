@@ -1,6 +1,6 @@
 {
   "name": "doodad-js-minifiers",
-  "version": "0.3.3",
+  "version": "0.3.5",
   "description": "doodad-js Minifiers (alpha)",
   "homepage": "https://sourceforge.net/projects/doodad-js/",
   "main": "index.js",
