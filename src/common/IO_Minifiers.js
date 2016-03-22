@@ -35,25 +35,30 @@
 		DD_MODULES = (DD_MODULES || {});
 		DD_MODULES['Doodad.IO.Minifiers'] = {
 			type: null,
-			version: '0.3.0d',
+			version: '0.4.0a',
 			namespaces: null,
 			dependencies: [
 				{
 					name: 'Doodad.Tools.Locale',
-					version: '1.3.0',
+					version: '2.0.0',
 				}, 
 				{
 					name: 'Doodad.Tools.Unicode',
-					version: '0.1.0',
+					version: '0.3.0',
 				}, 
 				{
 					name: 'Doodad.Tools.SafeEval',
-					version: '0.1.0',
+					version: '0.2.0',
 				}, 
 				{
 					name: 'Doodad.IO',
-					version: '0.4.0',
+					version: '1.0.0',
 				}, 
+				{
+					name: 'Doodad.NodeJs.IO',
+					version: '1.0.0',
+					optional: true,
+				},
 			],
 
 			create: function create(root, /*optional*/_options) {
@@ -70,6 +75,9 @@
 					ioMixIns = io.MixIns,
 					ioInterfaces = io.Interfaces,
 					extenders = doodad.Extenders,
+					nodejs = doodad.NodeJs,
+					nodejsIO = nodejs && nodejs.IO,
+					nodejsIOInterfaces = nodejsIO && nodejsIO.Interfaces,
 					minifiers = io.Minifiers;
 
 					
@@ -80,6 +88,7 @@
 				minifiers.REGISTER(io.Stream.$extend(
 									ioMixIns.TextInput,
 									ioMixIns.TextOutput,
+									/*optional*/ nodejsIOInterfaces && nodejsIOInterfaces.ITransform,
 				{
 					$TYPE_NAME: 'Javascript',
 
@@ -304,14 +313,14 @@
 							raw: code,
 							options: options,
 						};
-						data = this.transform(data) || data;
+						data = this.transform(data, options) || data;
 						
 						this.onWrite(new doodad.Event(data));
 						
 						var state = this.__state;
 
 						function writeToken(/*optional*/noSep) {
-							if (state.token.trim() === 'for') {
+							if (tools.trim(state.token) === 'for') {
 								state.isFor = true;
 								state.forLevel = 0;
 							};
@@ -331,9 +340,14 @@
 						};
 						
 						var curLocale = locale.getCurrent();
-						
-						code = state.prevChr + data.valueOf();
+
+						code = state.prevChr;
 						state.prevChr = '';
+
+						if (data.raw !== io.EOF) {
+							code += data.valueOf();
+						};
+						
 						analyseChunk: while (code) {
 							if (state.isDirective || state.isDirectiveBlock) {
 								var chr = unicode.nextChar(code);
@@ -343,7 +357,7 @@
 										break analyseChunk;
 									};
 									if (state.isDirectiveBlock && ((state.prevChr + chr.chr) === '*/')) {
-										if (state.directive.replace(/\t/g, ' ').trim()) {
+										if (tools.trim(state.directive.replace(/\t/g, ' '))) {
 											this.runDirective(state.directive);
 										};
 										state.prevChr = '';
@@ -361,7 +375,7 @@
 										// Wait next char
 										state.prevChr = chr.chr;
 									} else if ((chr.chr === '\n') || (chr.chr === '\r')) {
-										if (state.directive.replace(/\t/g, ' ').trim()) {
+										if (tools.trim(state.directive.replace(/\t/g, ' '))) {
 											this.runDirective(state.directive);
 										};
 										state.directive = '';
@@ -721,26 +735,27 @@
 							};
 						};
 
-						var value = data.valueOf();
-						
-						if (value === io.EOF) {
+						if (data.raw === io.EOF) {
 							writeToken();
 						};
 
 						
-						// TODO: Review
+						// TODO: Simplify me !!!
+						
 						var bufferSize = this.options.bufferSize,
 							callback = types.get(options, 'callback');
 
+						var duplex = nodejsIOInterfaces && this.getInterface(nodejsIOInterfaces.ITransform);
+										
 						var writeEOF = function writeEOF() {
-							if (value === io.EOF) {
+							if (data.raw === io.EOF) {
 								this.__clearState();
 								var newData = {
 									raw: io.EOF,
 								};
 								newData = this.transform(newData) || newData;
 								if (this.options.autoFlush) {
-									this.__buffer.push(newData.valueOf());
+									this.__buffer.push(newData);
 									this.flush(types.extend({}, options, {
 										callback: function() {
 											if (callback) {
@@ -753,10 +768,13 @@
 										var ev = new doodad.Event(newData);
 										this.onReady(ev);
 										if (!ev.prevent) {
-											this.__buffer.push(newData.valueOf());
+											this.__buffer.push(newData);
+											duplex && duplex.isPaused() && duplex.emit('readable');
+											duplex && duplex.emit('end');
+											duplex && duplex.emit('finish');
 										};
 									} else {
-										this.__buffer.push(newData.valueOf());
+										this.__buffer.push(newData);
 									};
 									if (callback) {
 										callback();
@@ -778,7 +796,7 @@
 							state.buffer = '';
 							newData = this.transform(newData) || newData;
 							if (this.options.autoFlush) {
-								this.__buffer.push(newData.valueOf());
+								this.__buffer.push(newData);
 								if (this.__buffer.length >= bufferSize) {
 									this.flush(types.extend({}, options, {
 										callback: new doodad.Callback(this, writeEOF),
@@ -791,10 +809,14 @@
 									var ev = new doodad.Event(newData);
 									this.onReady(ev);
 									if (!ev.prevent) {
-										this.__buffer.push(newData.valueOf());
+										var emitted = duplex && !duplex.isPaused() && duplex.emit('data', newData.valueOf());
+										if (!emitted) {
+											this.__buffer.push(newData);
+											duplex && duplex.emit('readable');
+										};
 									};
 								} else {
-									this.__buffer.push(newData.valueOf());
+									this.__buffer.push(newData);
 								};
 								writeEOF.call(this);
 							} else {
@@ -809,10 +831,17 @@
 						var callback = types.get(options, 'callback');
 						
 						if (this.__listening) {
+							var duplex = nodejsIOInterfaces && this.getInterface(nodejsIOInterfaces.ITransform);
 							var data;
 							while (data = this.__buffer.shift()) {
 								var ev = new doodad.Event(data);
 								this.onReady(ev);
+								if (data.raw === io.EOF) {
+									duplex && duplex.emit('end');
+									duplex && duplex.emit('finish');
+								} else {
+									duplex && duplex.emit('data', data.valueOf());
+								};
 							};
 						} else {
 							this.__buffer = [];
@@ -821,7 +850,7 @@
 						this.onFlush(new doodad.Event({
 							options: options,
 						}));
-						
+
 						if (callback) {
 							callback();
 						};
