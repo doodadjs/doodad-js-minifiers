@@ -27,11 +27,31 @@ module.exports = {
 	add: function add(DD_MODULES) {
 		DD_MODULES = (DD_MODULES || {});
 		DD_MODULES['doodad-js-minifiers'] = {
-			type: null,
-			version: '0.4.0a',
+			type: 'Package',
+			//! INSERT("version:'" + VERSION('doodad-js-minifiers') + "',")
 			namespaces: null,
-			dependencies: null,
-			exports: module.exports,
+			dependencies: [
+				{
+					name: 'doodad-js',
+					//! INSERT("version:'" + VERSION('doodad-js') + "',")
+				},
+				{
+					name: 'doodad-js-unicode',
+					//! INSERT("version:'" + VERSION('doodad-js-unicode') + "',")
+				},
+				{
+					name: 'doodad-js-locale',
+					//! INSERT("version:'" + VERSION('doodad-js-locale') + "',")
+				},
+				{
+					name: 'doodad-js-safeeval',
+					//! INSERT("version:'" + VERSION('doodad-js-safeeval') + "',")
+				},
+				{
+					name: 'doodad-js-io',
+					//! INSERT("version:'" + VERSION('doodad-js-io') + "',")
+				},
+			],
 			
 			create: function create(root, /*optional*/_options) {
 				var config = null;
@@ -44,7 +64,10 @@ module.exports = {
 				
 				require("./dist/doodad-js-minifiers/IO_Minifiers.min.js").add(modules);
 				
-				return root.Doodad.Namespaces.loadNamespaces(modules, null, config, false );
+				return root.Doodad.Namespaces.loadNamespaces(modules, null, config, false )
+					.then(function() {
+						// Returns nothing
+					});
 			},
 		};
 		return DD_MODULES;
