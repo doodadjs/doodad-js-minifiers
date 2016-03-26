@@ -35,31 +35,9 @@
 		DD_MODULES = (DD_MODULES || {});
 		DD_MODULES['Doodad.IO.Minifiers'] = {
 			type: null,
-			version: '0.4.0a',
+			//! INSERT("version:'" + VERSION('doodad-js-minifiers') + "',")
 			namespaces: null,
-			dependencies: [
-				{
-					name: 'Doodad.Tools.Locale',
-					version: '2.0.0',
-				}, 
-				{
-					name: 'Doodad.Tools.Unicode',
-					version: '0.3.0',
-				}, 
-				{
-					name: 'Doodad.Tools.SafeEval',
-					version: '0.2.0',
-				}, 
-				{
-					name: 'Doodad.IO',
-					version: '1.0.0',
-				}, 
-				{
-					name: 'Doodad.NodeJs.IO',
-					version: '1.0.0',
-					optional: true,
-				},
-			],
+			dependencies: null,
 
 			create: function create(root, /*optional*/_options) {
 				"use strict";
@@ -99,7 +77,7 @@
 					__directiveValues: doodad.PROTECTED(null),
 					__preparedDirectives: doodad.PROTECTED(null),
 					
-					__knownDirectives: doodad.PROTECTED({
+					__knownDirectives: doodad.PROTECTED(doodad.ATTRIBUTE({
 						INSERT: function(str) {
 							if (!this.__state.remove) {
 								this.__state.buffer += str;
@@ -186,7 +164,7 @@
 							};
 							this.__state.remove = false;
 						},
-					}),
+					}, extenders.ExtendObject)),
 			
 					
 					create: doodad.OVERRIDE(function create(/*optional*/options) {
