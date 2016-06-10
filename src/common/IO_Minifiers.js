@@ -96,7 +96,7 @@
 						VAR: function(key) {
 							if (this.memorize <= 0) {
 								//var tmp = key.split('.', 2);
-								//if (types.hasKey(tmp[0], this.variables)) {
+								//if (types.has(tmp[0], this.variables)) {
 									return safeEval.eval(key, this.variables)
 								//};
 							};
@@ -137,13 +137,13 @@
 						IF_DEF: function(key) {
 							this.pushDirective({
 								name: 'IF',
-								remove: !types.hasKey(this.variables, key),
+								remove: !types.has(this.variables, key),
 							});
 						},
 						IF_UNDEF: function(key) {
 							this.pushDirective({
 								name: 'IF',
-								remove: types.hasKey(this.variables, key),
+								remove: types.has(this.variables, key),
 							});
 						},
 						ELSE: function() {
