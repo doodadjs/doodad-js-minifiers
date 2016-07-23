@@ -43,7 +43,7 @@
 		DD_MODULES['Doodad.IO.Minifiers'] = {
 			version: /*! REPLACE_BY(TO_SOURCE(VERSION(MANIFEST("name")))) */ null /*! END_REPLACE() */,
 
-			create: function create(root, /*optional*/_options) {
+			create: function create(root, /*optional*/_options, _shared) {
 				"use strict";
 
 				var doodad = root.Doodad,
@@ -66,10 +66,10 @@
 				//var __Internal__ = {
 				//};
 				
-				var __Natives__ = {
+				types.complete(_shared.Natives, {
 					mathMax: global.Math.max,
 					mathMin: global.Math.min,
-				};
+				});
 				
 
 				minifiers.REGISTER(io.Stream.$extend(
@@ -108,7 +108,7 @@
 						},
 						INJECT: function(code, /*optional*/raw) {
 							if (this.memorize <= 0) {
-								code = String(code) + (raw ? '' : '\n');
+								code = types.toString(code) + (raw ? '' : '\n');
 								if (raw) {
 									this.writeCode(code);
 								} else {
@@ -390,8 +390,8 @@
 								code = (this.prevChr || '') + code;
 								this.prevChr = '';
 
-								state.index = (types.isNothing(start) ? 0 : __Natives__.mathMax(start, 0));
-								end = (types.isNothing(end) ? code.length : __Natives__.mathMin(end, code.length));
+								state.index = (types.isNothing(start) ? 0 : _shared.Natives.mathMax(start, 0));
+								end = (types.isNothing(end) ? code.length : _shared.Natives.mathMin(end, code.length));
 								
 								analyseChunk: while (state.index < end) {
 									var chr = unicode.nextChar(code, state.index, end);
@@ -680,6 +680,11 @@
 												};
 												continue nextChar;
 											} else if ((chr.codePoint === 123) || (chr.codePoint === 40) || (chr.codePoint === 91)) { // "{", "(", "["
+												if (chr.codePoint === 40) { // "("
+													if (this.newLine) {
+														this.hasSep = false;
+													};
+												};
 												this.writeToken(!this.explicitSep);
 												this.writeCode(chr.chr);
 												if (chr.codePoint === 40) { // "("
@@ -769,69 +774,69 @@
 						this.__state.directives.UNDEFINE(name);
 					}),
 					
-					__pushInternal: doodad.REPLACE(function __pushInternal(data, /*optional*/options) {
-						var state = this.__state,
-							next = types.get(options, 'next', false),
-							buffer = this.getBuffer(options);
+					push: doodad.OVERRIDE(function push(data, /*optional*/options) {
+						var isOutput = types.get(options, 'output', false);
+						if (isOutput) {
+							var noEvents = (this._implements(ioInterfaces.Listener) && !this.isListening()) || types.get(options, 'noEvents', false);
+							if (!noEvents) {
+								var ev = new doodad.Event(data);
 
-						if (!types.get(options, 'transformed', false)) {
-							data = this.transform(data, options);
-						};
-						
-						if (types.get(options, 'output', false)) {
+								this.onWrite(ev);
+
+								if (ev.prevent) {
+									// Consumed
+									var callback = types.get(ev.data.options, 'callback');
+									if (callback) {
+										var cbObj = types.get(ev.data.options, 'callbackObj');
+										delete ev.data.options.callbackObj;
+										delete ev.data.options.callback;
+										callback = new doodad.Callback(cbObj, callback);
+										callback(); // sync
+									};
+									return;
+								};
+							};
+
+							var state = this.__state;
+
 							if (data.raw !== io.EOF) {
 								state.parseCode(data.valueOf()); // sync
 							};
-						
+
+							// Transfer writes to read						
+							options = types.extend({}, options, {output: false});
+
 							if (state.buffer) {
 								var data2 = {
 									raw: state.buffer,
-									valueOf: function valueOf() {
+									valueOf: function() {
 										return this.raw;
 									},
 								};
+
 								state.buffer = '';
 
-								if (next) {
-									buffer.unshift(data2);
-								} else {
-									buffer.push(data2);
+								if (data.raw !== io.EOF) {
+									data2.options = data.options;
 								};
+
+								this._super(data2, options);
 							};
 							
 							if (data.raw === io.EOF) {
-								if (next) {
-									buffer.unshift(data);
-								} else {
-									buffer.push(data);
-								};
-								
 								this.__clearState();
+
+								this._super(data, options);
 							};
 
 						} else {
-							if (next) {
-								buffer.unshift(data);
-							} else {
-								buffer.push(data);
-							};
-							
+							this._super(data, options);
 						};
 					}),
-					
-					onFlushData: doodad.OVERRIDE(function onFlushData(ev) {
-						const retval = this._super(ev);
 
-						this.push(ev.data, {output: false, transformed: true});
-
-						const ireadable = this.getInterface(nodejsIOInterfaces.IReadable);
-
-						const emitted = ireadable.emit('readable');
-						if (emitted) {
-							ev.preventDefault();
-						};
-
-						return retval;
+					flush: doodad.OVERRIDE(function flush(/*optional*/options) {
+						options = types.extend({}, options, {output: false});
+						this._super(options);
 					}),
 				}));
 					
