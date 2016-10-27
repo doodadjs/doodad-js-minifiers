@@ -65,7 +65,6 @@ module.exports = {
 					$TYPE_NAME: 'Javascript',
 
 					__listening: doodad.PROTECTED(false),
-					__buffer: doodad.PROTECTED(null),
 					__state: doodad.PROTECTED(null),
 
 					__knownDirectives: doodad.PROTECTED(doodad.ATTRIBUTE({
@@ -890,7 +889,6 @@ module.exports = {
 					}),
 							
 					reset: doodad.OVERRIDE(function reset() {
-						//this.__buffer = [];
 						this.__listening = false;
 						this.__clearState();
 								
@@ -923,66 +921,41 @@ module.exports = {
 						this.__state.directives.UNDEFINE(name);
 					}),
 							
-					push: doodad.OVERRIDE(function push(data, /*optional*/options) {
-						var isOutput = types.get(options, 'output', false);
-						if (isOutput) {
-							var noEvents = (this._implements(ioMixIns.Listener) && !this.isListening()) || types.get(options, 'noEvents', false);
-							if (!noEvents) {
-								var ev = new doodad.Event(data);
+					onWrite: doodad.OVERRIDE(function onWrite(ev) {
+						const retval = this._super(ev);
 
-								this.onWrite(ev);
+						ev.preventDefault();
 
-								if (ev.prevent) {
-									// Consumed
-									var callback = types.get(ev.data.options, 'callback');
-									if (callback) {
-										delete ev.data.options.callback;
-										callback();
-									};
-									return;
-								};
+						var data = ev.data;
+						var state = this.__state;
+
+						state.parseCode(data.valueOf() || '', null, null, (data.raw === io.EOF)); // sync
+
+						if (state.buffer) {
+							var data2 = {
+								raw: state.buffer,
+								text: state.buffer,
+								valueOf: function() {
+									return this.text;
+								},
 							};
 
-							var state = this.__state;
+							state.buffer = '';
 
-							state.parseCode(data.valueOf() || '', null, null, (data.raw === io.EOF)); // sync
-
-							// Transfer writes to read						
-							options = types.extend({}, options, {output: false});
-
-							if (state.buffer) {
-								var data2 = {
-									raw: state.buffer,
-									valueOf: function() {
-										return this.raw;
-									},
-								};
-
-								state.buffer = '';
-
-								if (data.raw !== io.EOF) {
-									data2.options = data.options;
-								};
-
-								this._super(data2, options);
-							};
-									
-							if (data.raw === io.EOF) {
-								this.__clearState();
-
-								this._super(data, options);
-							} else {
-								this.overrideSuper();
+							if (data.raw !== io.EOF) {
+								data2.options = data.options;
 							};
 
-						} else {
-							this._super(data, options);
+							this.push(data2);
 						};
-					}),
+									
+						if (data.raw === io.EOF) {
+							this.__clearState();
 
-					flush: doodad.OVERRIDE(function flush(/*optional*/options) {
-						options = types.extend({}, options, {output: false});
-						this._super(options);
+							this.push(data);
+						};
+
+						return retval;
 					}),
 				}));
 							
