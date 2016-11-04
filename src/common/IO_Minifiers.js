@@ -924,12 +924,25 @@ module.exports = {
 					onWrite: doodad.OVERRIDE(function onWrite(ev) {
 						const retval = this._super(ev);
 
-						ev.preventDefault();
-
 						var data = ev.data;
 						var state = this.__state;
 
-						state.parseCode(data.valueOf() || '', null, null, (data.raw === io.EOF)); // sync
+						ev.preventDefault();
+						data.consumed = true;     // Will be consumed later
+
+						var eof = (data.raw === io.EOF);
+
+						state.parseCode(data.valueOf() || '', null, null, eof); // sync
+
+						var __consumeData = function consumeData() {
+							data.consumed = false;
+							if (eof) {
+								this.__clearState();
+								this.push(data);
+							} else {
+								this.__consumeData(data);
+							};
+						};
 
 						if (state.buffer) {
 							var data2 = {
@@ -942,19 +955,16 @@ module.exports = {
 
 							state.buffer = '';
 
-							if (data.raw !== io.EOF) {
+							if (!eof) {
 								data2.options = data.options;
 							};
 
-							this.push(data2);
+							this.push(data2, {callback: doodad.Callback(this, __consumeData)});
+
+						} else {
+							__consumeData.call(this);
 						};
 									
-						if (data.raw === io.EOF) {
-							this.__clearState();
-
-							this.push(data);
-						};
-
 						return retval;
 					}),
 				}));
