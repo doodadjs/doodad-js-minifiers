@@ -928,43 +928,27 @@ module.exports = {
 						var state = this.__state;
 
 						ev.preventDefault();
-						data.consumed = true;     // Will be consumed later
 
 						var eof = (data.raw === io.EOF);
 
 						state.parseCode(data.valueOf() || '', null, null, eof); // sync
 
-						var __consumeData = function consumeData() {
-							data.consumed = false;
-							if (eof) {
-								this.__clearState();
-								this.push(data);
-							} else {
-								this.__consumeData(data);
-							};
-						};
-
 						if (state.buffer) {
-							var data2 = {
-								raw: state.buffer,
-								text: state.buffer,
-								valueOf: function() {
-									return this.text;
-								},
-							};
-
+							var data2 = this.transform({raw: state.buffer});
 							state.buffer = '';
-
-							if (!eof) {
-								data2.options = data.options;
-							};
-
-							this.push(data2, {callback: doodad.Callback(this, __consumeData)});
-
-						} else {
-							__consumeData.call(this);
+							this.push(data2);
 						};
 									
+						if (eof) {
+							this.__clearState();
+							var data2 = this.transform({raw: io.EOF});
+							this.push(data2);
+						};
+
+						if (this.options.flushMode === 'half') {
+							this.flush(this.options.autoFlushOptions);
+						};
+
 						return retval;
 					}),
 				}));
