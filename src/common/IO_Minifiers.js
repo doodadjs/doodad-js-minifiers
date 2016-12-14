@@ -114,7 +114,7 @@ module.exports = {
 										var line = lines[i];
 										if (line) {
 											line = line.replace(/^\s*(var\s|const\s|let\s)/, 'tmp.');
-											safeEval.eval(line, mem, null, false);
+											safeEval.eval(line, mem);
 										};
 									};
 									if (!block.remove) {
@@ -144,6 +144,12 @@ module.exports = {
 								};
 							};
 						},
+						EVAL: function(expr) {
+							if (this.memorize <= 0) {
+								// TODO: Enhance "safeEval" so that we can declare functions (for ".map", ".filter", ".forEach", ...).
+								return safeEval.eval(expr, types.extend({global: global, root: root}, this.variables));
+							};
+						},
 						TO_SOURCE: function(val, /*optional*/depth) {
 							if (this.memorize <= 0) {
 								return types.toSource(val, depth);
@@ -171,10 +177,10 @@ module.exports = {
 								};
 							};
 						},
-						IF: function(expr) {
+						IF: function(val) {
 							this.pushDirective({
 								name: 'IF',
-								remove: !expr,
+								remove: !val,
 							});
 						},
 						IF_DEF: function(key) {
@@ -292,11 +298,15 @@ module.exports = {
 								var memorizedCode = this.memorizedCode;
 								this.memorizedCode = '';
 								if (memorizedCode) {
+									if (this.directives.IS_DEF(block.varName)) {
+										throw new types.Error("Variable '~0~' already defined.", [block.varName]);
+									};
 									var self = this;
 									tools.forEach(block.iter, function(item) {
 										self.directives.DEFINE(block.varName, item);
 										self.directives.INJECT(memorizedCode + '\n');
 									});
+									this.directives.UNDEFINE(block.varName);
 								};
 							};
 						},
@@ -322,17 +332,27 @@ module.exports = {
 								var memorizedCode = this.memorizedCode;
 								this.memorizedCode = '';
 								if (memorizedCode) {
+									if (this.directives.IS_DEF(block.varName)) {
+										throw new types.Error("Variable '~0~' already defined.", [block.varName]);
+									};
 									var items = types.values(block.iter);
 									for (var i = 0; i < items.length; i++) {
 										this.directives.DEFINE(block.varName, items[i]);
 										this.directives.INJECT(memorizedCode + (i < items.length - 1 ? ',' : ''));
 									};
+									this.directives.UNDEFINE(block.varName);
 								};
 							};
 						},
 					}, extenders.ExtendObject)),
 					
-							
+					__endMemorizeDirectives: doodad.PROTECTED(doodad.ATTRIBUTE([
+						'END_DEFINE',
+						'END_FOR',
+						'END_MAP',
+					], extenders.UniqueArray)),
+
+	
 					create: doodad.OVERRIDE(function create(/*optional*/options) {
 						types.getDefault(options, 'runDirectives', false);
 						types.getDefault(options, 'keepComments', false);
@@ -346,6 +366,7 @@ module.exports = {
 						var state = {
 							index: 0,
 							options: this.options,
+							endMemorizeDirectives: this.__endMemorizeDirectives,
 							variables: {},
 							directives: {},
 									
@@ -502,9 +523,15 @@ module.exports = {
 												if (this.options.runDirectives) {
 													this.directive = tools.trim(this.directive.replace(/\s/g, ' '));
 													if (this.directive) {
-														safeEval.eval(this.directive, this.directives);
-														if ((this.memorize > 0) && this.directive) {
+														var evaled = false;
+														if (tools.indexOf(this.endMemorizeDirectives, tools.split(this.directive, '(', 2)[0].trim()) >= 0) {
+															safeEval.eval(this.directive, this.directives);
+															evaled = true;
+														};
+														if (this.memorize > 0) {
 															this.memorizedCode += '/*!' + this.directive + '*/';
+														} else if (!evaled) {
+															safeEval.eval(this.directive, this.directives);
 														};
 													};
 													this.directive = '';
@@ -524,9 +551,15 @@ module.exports = {
 												if (this.options.runDirectives) {
 													this.directive = tools.trim(this.directive.replace(/\s/g, ' '));
 													if (this.directive) {
-														safeEval.eval(this.directive, this.directives);
-														if ((this.memorize > 0) && this.directive) {
+														var evaled = false;
+														if (tools.indexOf(this.endMemorizeDirectives, tools.split(this.directive, '(', 2)[0].trim()) >= 0) {
+															safeEval.eval(this.directive, this.directives);
+															evaled = true;
+														};
+														if (this.memorize > 0) {
 															this.memorizedCode += '/*!' + this.directive + '*/';
+														} else if (!evaled) {
+															safeEval.eval(this.directive, this.directives);
 														};
 													};
 													this.directive = '';
