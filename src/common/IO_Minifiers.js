@@ -69,14 +69,10 @@ module.exports = {
 
 					__knownDirectives: doodad.PROTECTED(doodad.ATTRIBUTE({
 						DEFINE: function(key, /*optional*/value) {
-							if (this.memorize <= 0) {
-								this.variables[key] = value;
-							};
+							this.variables[key] = value;
 						},
 						UNDEFINE: function(key) {
-							if (this.memorize <= 0) {
-								delete this.variables[key];
-							};
+							delete this.variables[key];
 						},
 						BEGIN_DEFINE: function(removeBlock) {
 							/*
@@ -88,14 +84,12 @@ module.exports = {
 										...
 									//! END_DEFINE()
 							*/
-							if (this.memorize <= 0) {
-								this.writeToken();
-							};
+							this.writeToken();
 							this.pushDirective({
 								name: 'DEFINE',
 								remove: removeBlock,
 							});
-							this.memorize++;
+							this.memorize = true;
 							this.directive = '';
 						},
 						END_DEFINE: function() {
@@ -103,25 +97,23 @@ module.exports = {
 							if (!block || (block.name !== 'DEFINE')) {
 								throw new types.Error("Invalid 'END_DEFINE' directive.");
 							};
-							this.memorize--;
-							if (this.memorize <= 0) {
-								var memorizedCode = this.memorizedCode;
-								this.memorizedCode = '';
-								if (memorizedCode) {
-									var lines = memorizedCode.split(/\n|\r/g);
-									var mem = {tmp: {}};
-									for (var i = 0; i < lines.length; i++) {
-										var line = lines[i];
-										if (line) {
-											line = line.replace(/^\s*(var\s|const\s|let\s)/, 'tmp.');
-											safeEval.eval(line, mem);
-										};
+							this.memorize = false;
+							var memorizedCode = this.memorizedCode;
+							this.memorizedCode = '';
+							if (memorizedCode) {
+								var lines = memorizedCode.split(/\n|\r/g);
+								var mem = {tmp: {}};
+								for (var i = 0; i < lines.length; i++) {
+									var line = lines[i];
+									if (line) {
+										line = line.replace(/^\s*(var\s|const\s|let\s)/, 'tmp.');
+										safeEval.eval(line, mem);
 									};
-									if (!block.remove) {
-										this.directives.INJECT(memorizedCode);
-									};
-									types.extend(this.variables, mem.tmp);
 								};
+								if (!block.remove) {
+									this.directives.INJECT(memorizedCode);
+								};
+								types.extend(this.variables, mem.tmp);
 							};
 						},
 						IS_DEF: function(key) {
@@ -137,48 +129,40 @@ module.exports = {
 							return !types.get(this.variables, key, false);
 						},
 						VAR: function(key) {
-							if (this.memorize <= 0) {
-								var tmp = tools.split(key, /\.|\[/g, 2);
-								if (types.has(this.variables, tmp[0])) {
-									return safeEval.eval(key, this.variables)
-								};
+							var tmp = tools.split(key, /\.|\[/g, 2);
+							if (types.has(this.variables, tmp[0])) {
+								return safeEval.eval(key, this.variables)
 							};
 						},
 						EVAL: function(expr) {
-							if (this.memorize <= 0) {
-								// TODO: Enhance "safeEval" so that we can use functions for ".map", ".filter", ".forEach", ...
-								//return safeEval.eval(expr, types.extend({global: global, root: root}, this.variables));
-								var locals = types.extend({global: global, root: root}, this.variables);
-								var fn = safeEval.createEval(types.keys(locals));
-								fn = fn.apply(null, types.values(locals));
-								return fn('(' + expr + ')');
-							};
+							// TODO: Enhance "safeEval" so that we can use functions for ".map", ".filter", ".forEach", ...
+							//return safeEval.eval(expr, types.extend({global: global, root: root}, this.variables));
+							var locals = types.extend({global: global, root: root}, this.variables);
+							var fn = safeEval.createEval(types.keys(locals));
+							fn = fn.apply(null, types.values(locals));
+							return fn('(' + expr + ')');
 						},
 						TO_SOURCE: function(val, /*optional*/depth) {
-							if (this.memorize <= 0) {
-								return types.toSource(val, depth);
-							};
+							return types.toSource(val, depth);
 						},
 						INJECT: function(code, /*optional*/raw) {
-							if (this.memorize <= 0) {
-								code = types.toString(code) + (raw ? '' : '\n');
-								if (raw) {
-									this.writeCode(code);
-								} else {
-									//var isDirective = this.isDirective,
-									//	isDirectiveBlock = this.isDirectiveBlock,
-									//	directive = this.directive;
+							code = types.toString(code) + (raw ? '' : '\n');
+							if (raw) {
+								this.writeCode(code);
+							} else {
+								//var isDirective = this.isDirective,
+								//	isDirectiveBlock = this.isDirectiveBlock,
+								//	directive = this.directive;
 												
-									this.isDirective = false;
-									this.isDirectiveBlock = false;
-									this.directive = '';
+								this.isDirective = false;
+								this.isDirectiveBlock = false;
+								this.directive = '';
 												
-									this.parseCode(code);
+								this.parseCode(code);
 											
-									//this.isDirective = isDirective;
-									//this.isDirectiveBlock = isDirectiveBlock;
-									//this.directive = directive;
-								};
+								//this.isDirective = isDirective;
+								//this.isDirectiveBlock = isDirectiveBlock;
+								//this.directive = directive;
 							};
 						},
 						IF: function(val) {
@@ -281,15 +265,13 @@ module.exports = {
 							};
 						},
 						FOR_EACH: function(iter, varName) {
-							if (this.memorize <= 0) {
-								this.writeToken();
-							};
+							this.writeToken();
 							this.pushDirective({
 								name: 'FOR',
 								iter: iter,
 								varName: varName,
 							});
-							this.memorize++;
+							this.memorize = true;
 							this.directive = '';
 						},
 						END_FOR: function() {
@@ -297,33 +279,29 @@ module.exports = {
 							if (!block || (block.name !== 'FOR')) {
 								throw new types.Error("Invalid 'END_FOR' directive.");
 							};
-							this.memorize--;
-							if (this.memorize <= 0) {
-								var memorizedCode = this.memorizedCode;
-								this.memorizedCode = '';
-								if (memorizedCode) {
-									if (this.directives.IS_DEF(block.varName)) {
-										throw new types.Error("Variable '~0~' already defined.", [block.varName]);
-									};
-									var self = this;
-									tools.forEach(block.iter, function(item) {
-										self.directives.DEFINE(block.varName, item);
-										self.directives.INJECT(memorizedCode + '\n');
-									});
-									this.directives.UNDEFINE(block.varName);
+							this.memorize = false;
+							var memorizedCode = this.memorizedCode;
+							this.memorizedCode = '';
+							if (memorizedCode) {
+								if (this.directives.IS_DEF(block.varName)) {
+									throw new types.Error("Variable '~0~' already defined.", [block.varName]);
 								};
+								var self = this;
+								tools.forEach(block.iter, function(item) {
+									self.directives.DEFINE(block.varName, item);
+									self.directives.INJECT(memorizedCode);
+								});
+								this.directives.UNDEFINE(block.varName);
 							};
 						},
 						MAP: function(iter, varName) {
-							if (this.memorize <= 0) {
-								this.writeToken();
-							};
+							this.writeToken();
 							this.pushDirective({
 								name: 'MAP',
 								iter: iter,
 								varName: varName,
 							});
-							this.memorize++;
+							this.memorize = true;
 							this.directive = '';
 						},
 						END_MAP: function() {
@@ -331,21 +309,19 @@ module.exports = {
 							if (!block || (block.name !== 'MAP')) {
 								throw new types.Error("Invalid 'END_MAP' directive.");
 							};
-							this.memorize--;
-							if (this.memorize <= 0) {
-								var memorizedCode = this.memorizedCode;
-								this.memorizedCode = '';
-								if (memorizedCode) {
-									if (this.directives.IS_DEF(block.varName)) {
-										throw new types.Error("Variable '~0~' already defined.", [block.varName]);
-									};
-									var items = types.values(block.iter);
-									for (var i = 0; i < items.length; i++) {
-										this.directives.DEFINE(block.varName, items[i]);
-										this.directives.INJECT(memorizedCode + (i < items.length - 1 ? ',' : ''));
-									};
-									this.directives.UNDEFINE(block.varName);
+							this.memorize = false;
+							var memorizedCode = this.memorizedCode;
+							this.memorizedCode = '';
+							if (memorizedCode) {
+								if (this.directives.IS_DEF(block.varName)) {
+									throw new types.Error("Variable '~0~' already defined.", [block.varName]);
 								};
+								var items = types.values(block.iter);
+								for (var i = 0; i < items.length; i++) {
+									this.directives.DEFINE(block.varName, items[i]);
+									this.directives.INJECT(memorizedCode + (i < items.length - 1 ? ',' : ''));
+								};
+								this.directives.UNDEFINE(block.varName);
 							};
 						},
 					}, extenders.ExtendObject)),
@@ -471,7 +447,7 @@ module.exports = {
 								return block;
 							},
 							
-							memorize: 0,
+							memorize: false,
 							memorizedCode: '',
 							
 							writeCode: function writeCode(code) {
@@ -532,7 +508,7 @@ module.exports = {
 															safeEval.eval(this.directive, this.directives);
 															evaled = true;
 														};
-														if (this.memorize > 0) {
+														if (this.memorize) {
 															this.memorizedCode += '/*!' + this.directive + '*/';
 														} else if (!evaled) {
 															safeEval.eval(this.directive, this.directives);
@@ -560,7 +536,7 @@ module.exports = {
 															safeEval.eval(this.directive, this.directives);
 															evaled = true;
 														};
-														if (this.memorize > 0) {
+														if (this.memorize) {
 															this.memorizedCode += '/*!' + this.directive + '*/';
 														} else if (!evaled) {
 															safeEval.eval(this.directive, this.directives);
