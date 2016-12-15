@@ -146,8 +146,12 @@ module.exports = {
 						},
 						EVAL: function(expr) {
 							if (this.memorize <= 0) {
-								// TODO: Enhance "safeEval" so that we can declare functions (for ".map", ".filter", ".forEach", ...).
-								return safeEval.eval(expr, types.extend({global: global, root: root}, this.variables));
+								// TODO: Enhance "safeEval" so that we can use functions for ".map", ".filter", ".forEach", ...
+								//return safeEval.eval(expr, types.extend({global: global, root: root}, this.variables));
+								var locals = types.extend({global: global, root: root}, this.variables);
+								var fn = safeEval.createEval(types.keys(locals));
+								fn = fn.apply(null, types.values(locals));
+								return fn('(' + expr + ')');
 							};
 						},
 						TO_SOURCE: function(val, /*optional*/depth) {
