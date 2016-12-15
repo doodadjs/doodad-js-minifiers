@@ -89,15 +89,12 @@ module.exports = {
 								name: 'DEFINE',
 								remove: removeBlock,
 							});
-							this.memorize = true;
-							this.directive = '';
 						},
 						END_DEFINE: function() {
 							var block = this.popDirective();
 							if (!block || (block.name !== 'DEFINE')) {
 								throw new types.Error("Invalid 'END_DEFINE' directive.");
 							};
-							this.memorize = false;
 							var memorizedCode = this.memorizedCode;
 							this.memorizedCode = '';
 							if (memorizedCode) {
@@ -271,15 +268,12 @@ module.exports = {
 								iter: iter,
 								varName: varName,
 							});
-							this.memorize = true;
-							this.directive = '';
 						},
 						END_FOR: function() {
 							var block = this.popDirective();
 							if (!block || (block.name !== 'FOR')) {
 								throw new types.Error("Invalid 'END_FOR' directive.");
 							};
-							this.memorize = false;
 							var memorizedCode = this.memorizedCode;
 							this.memorizedCode = '';
 							if (memorizedCode) {
@@ -301,15 +295,12 @@ module.exports = {
 								iter: iter,
 								varName: varName,
 							});
-							this.memorize = true;
-							this.directive = '';
 						},
 						END_MAP: function() {
 							var block = this.popDirective();
 							if (!block || (block.name !== 'MAP')) {
 								throw new types.Error("Invalid 'END_MAP' directive.");
 							};
-							this.memorize = false;
 							var memorizedCode = this.memorizedCode;
 							this.memorizedCode = '';
 							if (memorizedCode) {
@@ -326,6 +317,12 @@ module.exports = {
 						},
 					}, extenders.ExtendObject)),
 					
+					__beginMemorizeDirectives: doodad.PROTECTED(doodad.ATTRIBUTE([
+						'BEGIN_DEFINE',
+						'FOR_EACH',
+						'MAP',
+					], extenders.UniqueArray)),
+
 					__endMemorizeDirectives: doodad.PROTECTED(doodad.ATTRIBUTE([
 						'END_DEFINE',
 						'END_FOR',
@@ -346,6 +343,7 @@ module.exports = {
 						var state = {
 							index: 0,
 							options: this.options,
+							beginMemorizeDirectives: this.__beginMemorizeDirectives,
 							endMemorizeDirectives: this.__endMemorizeDirectives,
 							variables: {},
 							directives: {},
@@ -447,11 +445,11 @@ module.exports = {
 								return block;
 							},
 							
-							memorize: false,
+							memorize: 0,
 							memorizedCode: '',
 							
 							writeCode: function writeCode(code) {
-								if (this.memorize) {
+								if (this.memorize > 0) {
 									this.memorizedCode += code;
 								} else if (!this.getDirective().remove) {
 									this.buffer += code;
@@ -475,7 +473,32 @@ module.exports = {
 								this.endBrace = false;
 								this.hasSep = true;
 							},
-							
+							runDirective: function runDirective(directive) {
+								if (this.options.runDirectives) {
+									directive = tools.trim(directive.replace(/^\s*/, ''));
+									if (directive) {
+										var name = tools.split(directive, '(', 2)[0].trim();
+										var evaled = false;
+										if (tools.indexOf(this.beginMemorizeDirectives, name) >= 0) {
+											if (this.memorize === 0) {
+												safeEval.eval(directive, this.directives);
+												evaled = true;
+											};
+											this.memorize++;
+										} else if (tools.indexOf(this.endMemorizeDirectives, name) >= 0) {
+											this.memorize--;
+										};
+										if (!evaled) {
+											if (this.memorize > 0) {
+												this.memorizedCode += '/*!' + directive + '*/';
+											} else {
+												safeEval.eval(directive, this.directives);
+											};
+										};
+									};
+								};
+							},
+
 							parseCode: function(code, /*optional*/start, /*optional*/end, /*optional*/eof) {
 								var curLocale = locale.getCurrent();
 
@@ -500,22 +523,9 @@ module.exports = {
 											if (this.isDirectiveBlock && ((this.prevChr + chr.chr) === '*/')) {
 												this.isDirectiveBlock = false;
 												this.prevChr = '';
-												if (this.options.runDirectives) {
-													this.directive = tools.trim(this.directive.replace(/\s/g, ' '));
-													if (this.directive) {
-														var evaled = false;
-														if (tools.indexOf(this.endMemorizeDirectives, tools.split(this.directive, '(', 2)[0].trim()) >= 0) {
-															safeEval.eval(this.directive, this.directives);
-															evaled = true;
-														};
-														if (this.memorize) {
-															this.memorizedCode += '/*!' + this.directive + '*/';
-														} else if (!evaled) {
-															safeEval.eval(this.directive, this.directives);
-														};
-													};
-													this.directive = '';
-												};
+												var directive = this.directive;
+												this.directive = '';
+												this.runDirective(directive);
 												this.index = chr.index + chr.size;
 												continue analyseChunk;
 											} else if (this.prevChr) { // '*'
@@ -528,22 +538,9 @@ module.exports = {
 											} else if ((chr.chr === '\n') || (chr.chr === '\r')) {
 												this.isDirective = false;
 												this.prevChr = '';
-												if (this.options.runDirectives) {
-													this.directive = tools.trim(this.directive.replace(/\s/g, ' '));
-													if (this.directive) {
-														var evaled = false;
-														if (tools.indexOf(this.endMemorizeDirectives, tools.split(this.directive, '(', 2)[0].trim()) >= 0) {
-															safeEval.eval(this.directive, this.directives);
-															evaled = true;
-														};
-														if (this.memorize) {
-															this.memorizedCode += '/*!' + this.directive + '*/';
-														} else if (!evaled) {
-															safeEval.eval(this.directive, this.directives);
-														};
-													};
-													this.directive = '';
-												};
+												var directive = this.directive;
+												this.directive = '';
+												this.runDirective(directive);
 												if (!this.isDirectiveBlock) {
 													this.index = chr.index + chr.size;
 													continue analyseChunk;
