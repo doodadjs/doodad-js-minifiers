@@ -63,6 +63,7 @@ module.exports = {
 									io.TextOutputStream,
 				{
 					$TYPE_NAME: 'Javascript',
+					$TYPE_UUID: '' /*! INJECT('+' + TO_SOURCE(UUID('Javascript')), true) */,
 
 					__listening: doodad.PROTECTED(false),
 					__state: doodad.PROTECTED(null),
