@@ -133,12 +133,7 @@ module.exports = {
 							};
 						},
 						EVAL: function(expr) {
-							// TODO: Enhance "safeEval" so that we can use functions for ".map", ".filter", ".forEach", ...
-							//return safeEval.eval(expr, types.extend({global: global, root: root}, this.variables));
-							var locals = types.extend({global: global, root: root}, this.variables);
-							var fn = safeEval.createEval(types.keys(locals));
-							fn = fn.apply(null, types.values(locals));
-							return fn('(' + expr + ')');
+							return safeEval.eval(expr, types.extend({global: global, root: root}, this.variables), null, null, true);
 						},
 						TO_SOURCE: function(val, /*optional*/depth) {
 							return types.toSource(val, depth);
