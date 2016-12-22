@@ -284,11 +284,11 @@ module.exports = {
 								this.directives.UNDEFINE(block.varName);
 							};
 						},
-						MAP: function(iter, varName) {
+						MAP: function(ar, varName) {
 							this.writeToken();
 							this.pushDirective({
 								name: 'MAP',
-								iter: iter,
+								array: ar,
 								varName: varName,
 							});
 						},
@@ -303,10 +303,13 @@ module.exports = {
 								if (this.directives.IS_DEF(block.varName)) {
 									throw new types.Error("Variable '~0~' already defined.", [block.varName]);
 								};
-								var items = types.values(block.iter);
-								for (var i = 0; i < items.length; i++) {
-									this.directives.DEFINE(block.varName, items[i]);
-									this.directives.INJECT(memorizedCode + (i < items.length - 1 ? ',' : ''));
+								var ar = block.array,
+									arLen = ar.length;
+								for (var i = 0; i < arLen; i++) {
+									if (i in ar) {
+										this.directives.DEFINE(block.varName, ar[i]);
+										this.directives.INJECT(memorizedCode + (i < arLen - 1 ? ',' : ''));
+									};
 								};
 								this.directives.UNDEFINE(block.varName);
 							};
