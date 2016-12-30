@@ -367,34 +367,37 @@ module.exports = {
 							explicitSep: false,
 							newLine: false,
 							endBrace: false,
-							isDo: false,
 									
 							isTemplateExpression: false,
 							isFor: false,
-							braceLevel: 0,
-							parentheseLevel: 0,
+							isForArguments: false,
+							isDo: false,
 							levelStack: [],
-							pushLevel: function pushLevel() {
+							pushLevel: function pushLevel(name) {
 								this.levelStack.push({
+									name: name,
 									isTemplate: this.isTemplate,
 									isTemplateExpression: this.isTemplateExpression,
-									isFor: this.isFor,
-									braceLevel: this.braceLevel, 
-									parentheseLevel: this.parentheseLevel,
+									isForArguments: this.isForArguments,
+									isDo: this.isDo,
 								});
 								this.isTemplate = false;
 								this.isTemplateExpression = false;
-								this.isFor = false;
-								this.braceLevel = 0;
-								this.parentheseLevel = 0;
+								if (this.isFor) {
+									this.isFor = false;
+									this.isForArguments = true;
+								} else {
+									this.isForArguments = false;
+								};
+								this.isDo = false;
 							},
-							popLevel: function popLevel() {
-								var level = this.levelStack.pop() || {};
-								this.isTemplate = level.isTemplate || false;
-								this.isTemplateExpression = level.isTemplateExpression || false;
-								this.isFor = level.isFor || false;
-								this.braceLevel = level.braceLevel || 0;
-								this.parentheseLevel = level.parentheseLevel || 0;
+							popLevel: function popLevel(name) {
+								var level = this.levelStack.pop() || types.nullObject();
+								// TODO: if (name !== level.name) { ??? };
+								this.isTemplate = !!level.isTemplate;
+								this.isTemplateExpression = !!level.isTemplateExpression;
+								this.isForArguments = !!level.isForArguments;
+								this.isDo = !!level.isDo;
 							},
 									
 							isDirective: false,
@@ -457,10 +460,6 @@ module.exports = {
 								this.hasSep = false;
 							},
 							writeToken: function writeToken(/*optional*/noSep) {
-								if (this.token === 'for') {
-									this.pushLevel();
-									this.isFor = true;
-								};
 								if (noSep || this.hasSep) {
 									this.writeCode(this.token);
 								} else {
@@ -623,7 +622,7 @@ module.exports = {
 												this.isEscaped = true;
 											} else if (this.isTemplate && ((this.prevChr + chr.chr) === '${')) {
 												this.prevChr = '';
-												this.pushLevel();
+												this.pushLevel('{');
 												this.isTemplateExpression = true;
 												this.writeCode(code.slice(this.index, chr.index + chr.size));
 												this.index = chr.index + chr.size;
@@ -768,7 +767,7 @@ module.exports = {
 													if (chr.codePoint === 59) { // ";"
 														this.sep = ';';
 														this.explicitSep = true;
-														if (!this.options.keepSpaces && this.isFor && (this.parentheseLevel === 1)) {
+														if (!this.options.keepSpaces && this.isForArguments) {
 															this.hasSep = false;
 															this.writeToken();
 														};
@@ -814,11 +813,16 @@ module.exports = {
 													};
 												} while ((chr.codePoint === 36) || (chr.codePoint === 95) || unicode.isAlnum(chr.chr, curLocale)); // "$", "_", "{alnum}"
 												if (chr) {
-													if (token === 'do') {
-														//this.isDo = true; // TODO: Complete "do" statement. Will need a brakets stack.
-													} else if (this.endBrace && ((['else', 'catch', 'finally', 'until'].indexOf(token) >= 0) || (this.isDo && (token === 'while')))) {
-														// No separator before these keywords
-														this.hasSep = true;
+													if (token === 'for') {
+														this.isFor = true;
+													} else if (token === 'do') {
+														this.isDo = true;
+													} else {
+														if (this.endBrace && ((['else', 'catch', 'finally', 'until'].indexOf(token) >= 0) || (this.isDo && (token === 'while')))) {
+															// No separator before these keywords
+															this.hasSep = true;
+														};
+														this.isDo = this.isFor = false;
 													};
 													if (this.token || this.explicitSep || this.newLine) {
 														if (this.token || this.explicitSep) {
@@ -842,30 +846,23 @@ module.exports = {
 												this.writeToken(!this.explicitSep);
 												this.writeCode(chr.chr);
 												if (chr.codePoint === 40) { // "("
-													this.parentheseLevel++;
+													this.pushLevel('(');
 												} else if (chr.codePoint === 123) { // "{"
-													this.braceLevel++;
+													this.pushLevel('{');
 												};
 												this.hasSep = true;
 												this.ignoreRegExp = false;
 											} else if ((chr.codePoint === 125) || (chr.codePoint === 41) || (chr.codePoint === 93)) { // "}", ")", "]"
 												if (chr.codePoint === 41) { // ")"
-													this.parentheseLevel--;
-													if (this.parentheseLevel <= 0) {
-														this.popLevel();
-													};
+													this.popLevel('(');
 												} else if (chr.codePoint === 125) { // "}"
-													this.braceLevel--;
-													if (this.braceLevel <= 0) {
-														this.braceLevel = 0;
-														if (this.isTemplateExpression) {
-															this.popLevel();
-															this.stringChr = '`';
-															this.writeToken(true);
-															this.writeCode(chr.chr);
-															this.index = chr.index + chr.size;
-															continue analyseChunk;
-														};
+													this.popLevel('{');
+													if (this.isTemplateExpression) {
+														this.stringChr = '`';
+														this.writeToken(true);
+														this.writeCode(chr.chr);
+														this.index = chr.index + chr.size;
+														continue analyseChunk;
 													};
 												};
 												this.writeToken(true);
