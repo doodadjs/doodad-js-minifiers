@@ -367,6 +367,7 @@ module.exports = {
 							explicitSep: false,
 							newLine: false,
 							endBrace: false,
+							isDo: false,
 									
 							isTemplateExpression: false,
 							isFor: false,
@@ -798,15 +799,6 @@ module.exports = {
 												};
 												continue nextChar;
 											} else if ((chr.codePoint === 36) || (chr.codePoint === 95) || unicode.isAlnum(chr.chr, curLocale)) { // "$", "_", "{alnum}"
-												if (this.token || this.explicitSep || this.newLine) {
-													if (this.token || this.explicitSep) {
-														this.hasSep = false;
-													};
-													if (this.newLine) {
-														this.sep = ';';
-													};
-													this.writeToken(); // write current token and separator
-												};
 												var token = '';
 												doAlnum: do {
 													token += chr.chr; // build new token
@@ -822,11 +814,22 @@ module.exports = {
 													};
 												} while ((chr.codePoint === 36) || (chr.codePoint === 95) || unicode.isAlnum(chr.chr, curLocale)); // "$", "_", "{alnum}"
 												if (chr) {
+													if (token === 'do') {
+														//this.isDo = true; // TODO: Complete "do" statement. Will need a brakets stack.
+													} else if (this.endBrace && ((['else', 'catch', 'finally', 'until'].indexOf(token) >= 0) || (this.isDo && (token === 'while')))) {
+														// No separator before these keywords
+														this.hasSep = true;
+													};
+													if (this.token || this.explicitSep || this.newLine) {
+														if (this.token || this.explicitSep) {
+															this.hasSep = false;
+														};
+														if (this.newLine) {
+															this.sep = ';';
+														};
+														this.writeToken(); // write current token and separator
+													};
 													this.token = token;
-													//if (this.endBrace && (['else', 'catch', 'finally', 'while', 'until'].indexOf(token) >= 0)) {
-													//	// No separator before these keywords
-													//	this.hasSep = true;
-													//};
 												};
 												this.ignoreRegExp = false;
 												continue nextChar;
@@ -867,9 +870,9 @@ module.exports = {
 												};
 												this.writeToken(true);
 												this.writeCode(chr.chr);
-												//if (chr.codePoint === 125) { // "}"
-												//	this.endBrace = true;
-												//};
+												if (chr.codePoint === 125) { // "}"
+													this.endBrace = true;
+												};
 												this.ignoreRegExp = true;
 											} else { // TOKEN+OP+TOKEN : "=", "==", "===", "!=", "!==", "%", "*", "&", "^", "^=", "&=", "|", "|=", "&&", "||", "^", '<', '>', '<=', '>=', '<<', '>>', '<<=', '>>=', '>>>=', '<<<', '>>>', '.', ',', '+=', '-=', '*=', '/=', '%=', '**', '**=', "?", ":"
 														// OP+TOKEN       : "!", "~"
