@@ -329,11 +329,11 @@ module.exports = {
 					], extenders.UniqueArray)),
 
 	
-					create: doodad.OVERRIDE(function create(/*optional*/options) {
-						types.getDefault(options, 'runDirectives', false);
-						types.getDefault(options, 'keepComments', false);
-						types.getDefault(options, 'keepSpaces', false);
-						//TODO: types.getDefault(options, 'removeEmptyLines', false);
+					setOptions: doodad.OVERRIDE(function setOptions(options) {
+						types.getDefault(options, 'runDirectives', types.getIn(this.options, 'runDirectives', false));
+						types.getDefault(options, 'keepComments', types.getIn(this.options, 'keepComments', false));
+						types.getDefault(options, 'keepSpaces', types.getIn(this.options, 'keepSpaces', false));
+						//TODO: types.getDefault(options, 'removeEmptyLines', types.getIn(this.options, 'removeEmptyLines', false));
 
 						this._super(options);
 					}),
