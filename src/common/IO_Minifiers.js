@@ -141,6 +141,7 @@ module.exports = {
 						INJECT: function(code, /*optional*/raw) {
 							code = types.toString(code) + (raw ? '' : '\n');
 							if (raw) {
+								this.writeToken();
 								this.writeCode(code);
 							} else {
 								//var isDirective = this.isDirective,
