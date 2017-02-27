@@ -935,24 +935,36 @@ module.exports = {
 						const retval = this._super(ev);
 
 						var data = ev.data;
-						var state = this.__state;
+						var minifierState = this.__state;
 
 						ev.preventDefault();
 
+						data.delayed = true;
+						const pushState = {count: 0};
+						const consumeCallback = doodad.AsyncCallback(this, function consume() {
+							pushState.count--;
+							if (pushState.count <= 0) {
+								this.__consumeData(data);
+							};
+						});
+
 						var eof = (data.raw === io.EOF);
 
-						state.parseCode(data.valueOf() || '', null, null, eof); // sync
+						minifierState.parseCode(data.valueOf() || '', null, null, eof); // sync
 
-						if (state.buffer) {
-							var data2 = this.transform({raw: state.buffer});
-							state.buffer = '';
-							this.push(data2);
+						if (minifierState.buffer) {
+							var data2 = this.transform({raw: minifierState.buffer});
+							minifierState.buffer = '';
+							
+							pushState.count++;
+							this.push(data2, {callback: consumeCallback});
 						};
 									
 						if (eof) {
 							this.__clearState();
 							var data2 = this.transform({raw: io.EOF});
-							this.push(data2);
+							pushState.count++;
+							this.push(data2, {callback: consumeCallback});
 						};
 
 						if (this.options.flushMode === 'half') {
