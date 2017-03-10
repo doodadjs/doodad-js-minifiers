@@ -32,7 +32,7 @@ module.exports = {
 			create: function create(root, /*optional*/_options, _shared) {
 				"use strict";
 
-				var doodad = root.Doodad,
+				const doodad = root.Doodad,
 					mixIns = doodad.MixIns,
 					types = doodad.Types,
 					tools = doodad.Tools,
@@ -49,7 +49,7 @@ module.exports = {
 					minifiers = io.Minifiers;
 
 							
-				//var __Internal__ = {
+				//const __Internal__ = {
 				//};
 						
 				types.complete(_shared.Natives, {
@@ -79,8 +79,8 @@ module.exports = {
 							/*
 								ex: 
 									//! BEGIN_DEFINE()
-										var a = 1;
-										var b = '2';
+										let a = 1;
+										const b = '2';
 										var c = null;
 										...
 									//! END_DEFINE()
@@ -92,17 +92,17 @@ module.exports = {
 							});
 						},
 						END_DEFINE: function() {
-							var block = this.popDirective();
+							const block = this.popDirective();
 							if (!block || (block.name !== 'DEFINE')) {
 								throw new types.Error("Invalid 'END_DEFINE' directive.");
 							};
-							var memorizedCode = this.memorizedCode;
+							const memorizedCode = this.memorizedCode;
 							this.memorizedCode = '';
 							if (memorizedCode) {
-								var lines = memorizedCode.split(/\n|\r/g);
-								var mem = {tmp: {}};
-								for (var i = 0; i < lines.length; i++) {
-									var line = lines[i];
+								const lines = memorizedCode.split(/\n|\r/g);
+								const mem = {tmp: {}};
+								for (let i = 0; i < lines.length; i++) {
+									let line = lines[i];
 									if (line) {
 										line = line.replace(/^\s*(var\s|const\s|let\s)/, 'tmp.');
 										safeEval.eval(line, mem);
@@ -127,7 +127,7 @@ module.exports = {
 							return !types.get(this.variables, key, false);
 						},
 						VAR: function(key) {
-							var tmp = tools.split(key, /\.|\[/g, 2);
+							const tmp = tools.split(key, /\.|\[/g, 2);
 							if (types.has(this.variables, tmp[0])) {
 								return safeEval.eval(key, this.variables)
 							};
@@ -144,7 +144,7 @@ module.exports = {
 								this.writeToken();
 								this.writeCode(code);
 							} else {
-								//var isDirective = this.isDirective,
+								//const isDirective = this.isDirective,
 								//	isDirectiveBlock = this.isDirectiveBlock,
 								//	directive = this.directive;
 												
@@ -190,7 +190,7 @@ module.exports = {
 							});
 						},
 						ELSE: function() {
-							var block = this.popDirective();
+							const block = this.popDirective();
 							if (!block || (block.name !== 'IF')) {
 								throw new types.Error("Invalid 'ELSE' directive.");
 							};
@@ -200,7 +200,7 @@ module.exports = {
 							});
 						},
 						ELSE_IF: function(expr) {
-							var block = this.popDirective();
+							const block = this.popDirective();
 							if (!block || (block.name !== 'IF')) {
 								throw new types.Error("Invalid 'ELSE_IF' directive.");
 							};
@@ -210,7 +210,7 @@ module.exports = {
 							});
 						},
 						END_IF: function() {
-							var block = this.popDirective();
+							const block = this.popDirective();
 							if (!block || (block.name !== 'IF')) {
 								throw new types.Error("Invalid 'END_IF' directive.");
 							};
@@ -232,7 +232,7 @@ module.exports = {
 							});
 						},
 						END_REPLACE: function() {
-							var block = this.popDirective();
+							const block = this.popDirective();
 							if (!block || (block.name !== 'REPLACE')) {
 								throw new types.Error("Invalid 'END_REPLACE' directive.");
 							};
@@ -253,7 +253,7 @@ module.exports = {
 							});
 						},
 						END_REMOVE: function() {
-							var block = this.popDirective();
+							const block = this.popDirective();
 							if (!block || (block.name !== 'REMOVE')) {
 								throw new types.Error("Invalid 'END_REMOVE' directive.");
 							};
@@ -267,21 +267,20 @@ module.exports = {
 							});
 						},
 						END_FOR: function() {
-							var block = this.popDirective();
+							const block = this.popDirective();
 							if (!block || (block.name !== 'FOR')) {
 								throw new types.Error("Invalid 'END_FOR' directive.");
 							};
-							var memorizedCode = this.memorizedCode;
+							const memorizedCode = this.memorizedCode;
 							this.memorizedCode = '';
 							if (memorizedCode) {
 								if (this.directives.IS_DEF(block.varName)) {
 									throw new types.Error("Variable '~0~' already defined.", [block.varName]);
 								};
-								var self = this;
 								tools.forEach(block.iter, function(item) {
-									self.directives.DEFINE(block.varName, item);
-									self.directives.INJECT(memorizedCode);
-								});
+									this.directives.DEFINE(block.varName, item);
+									this.directives.INJECT(memorizedCode);
+								}, this);
 								this.directives.UNDEFINE(block.varName);
 							};
 						},
@@ -294,20 +293,20 @@ module.exports = {
 							});
 						},
 						END_MAP: function() {
-							var block = this.popDirective();
+							const block = this.popDirective();
 							if (!block || (block.name !== 'MAP')) {
 								throw new types.Error("Invalid 'END_MAP' directive.");
 							};
-							var memorizedCode = this.memorizedCode;
+							const memorizedCode = this.memorizedCode;
 							this.memorizedCode = '';
 							if (memorizedCode) {
 								if (this.directives.IS_DEF(block.varName)) {
 									throw new types.Error("Variable '~0~' already defined.", [block.varName]);
 								};
-								var ar = block.array,
+								const ar = block.array,
 									arLen = ar.length;
-								for (var i = 0; i < arLen; i++) {
-									if (i in ar) {
+								for (let i = 0; i < arLen; i++) {
+									if (types.has(ar, i)) {
 										this.directives.DEFINE(block.varName, ar[i]);
 										this.directives.INJECT(memorizedCode + (i < arLen - 1 ? ',' : ''));
 									};
@@ -340,7 +339,7 @@ module.exports = {
 					}),
 							
 					__clearState: doodad.PROTECTED(function() {
-						var state = {
+						const state = {
 							index: 0,
 							options: this.options,
 							beginMemorizeDirectives: this.__beginMemorizeDirectives,
@@ -393,7 +392,7 @@ module.exports = {
 								this.isDo = false;
 							},
 							popLevel: function popLevel(name) {
-								var level = this.levelStack.pop() || types.nullObject();
+								const level = this.levelStack.pop() || types.nullObject();
 								// TODO: if (name !== level.name) { ??? };
 								this.isTemplate = !!level.isTemplate;
 								this.isTemplateExpression = !!level.isTemplateExpression;
@@ -421,7 +420,7 @@ module.exports = {
 								if (!newBlock.name) {
 									throw new types.Error("Missing a name to new block.");
 								};
-								var block = this.getDirective();
+								const block = this.getDirective();
 								newBlock.remove = newBlock.remove || block.remove;
 								if (newBlock.remove) {
 									newBlock.token = this.token;
@@ -437,7 +436,7 @@ module.exports = {
 								if (this.directiveStack <= 1) {
 									return null;
 								};
-								var block = this.directiveStack.shift();
+								const block = this.directiveStack.shift();
 								if (block.remove) {
 									this.token = block.token;
 									this.sep = block.sep;
@@ -477,8 +476,8 @@ module.exports = {
 								if (this.options.runDirectives) {
 									directive = tools.trim(directive.replace(/^\s*/, ''));
 									if (directive) {
-										var name = tools.split(directive, '(', 2)[0].trim();
-										var evaled = false;
+										const name = tools.split(directive, '(', 2)[0].trim();
+										let evaled = false;
 										if (tools.indexOf(this.beginMemorizeDirectives, name) >= 0) {
 											if (this.memorize === 0) {
 												safeEval.eval(directive, this.directives);
@@ -500,7 +499,7 @@ module.exports = {
 							},
 
 							parseCode: function(code, /*optional*/start, /*optional*/end, /*optional*/eof) {
-								var curLocale = locale.getCurrent();
+								const curLocale = locale.getCurrent();
 
 								code = (this.prevChr || '') + (code || '');
 								this.prevChr = '';
@@ -513,7 +512,7 @@ module.exports = {
 								end = (types.isNothing(end) ? code.length : _shared.Natives.mathMin(end, code.length));
 										
 								analyseChunk: while (this.index < end) {
-									var chr = unicode.nextChar(code, this.index, end);
+									let chr = unicode.nextChar(code, this.index, end);
 									if (this.isDirective || this.isDirectiveBlock) {
 										nextCharDirective: while (chr) {
 											if (!chr.complete) {
@@ -523,7 +522,7 @@ module.exports = {
 											if (this.isDirectiveBlock && ((this.prevChr + chr.chr) === '*/')) {
 												this.isDirectiveBlock = false;
 												this.prevChr = '';
-												var directive = this.directive;
+												const directive = this.directive;
 												this.directive = '';
 												this.runDirective(directive);
 												this.index = chr.index + chr.size;
@@ -538,7 +537,7 @@ module.exports = {
 											} else if ((chr.chr === '\n') || (chr.chr === '\r')) {
 												this.isDirective = false;
 												this.prevChr = '';
-												var directive = this.directive;
+												const directive = this.directive;
 												this.directive = '';
 												this.runDirective(directive);
 												if (!this.isDirectiveBlock) {
@@ -610,7 +609,7 @@ module.exports = {
 												// NOTE: "new line" can be "\r\n" or "\n\r", so there is no condition on "this.isEscaped"
 												// Multi-Line String. New line is removed. It assumes new line is escaped because otherwise it is a synthax error.
 												// Exemple :
-												//     var a = "Hello \
+												//     const a = "Hello \
 												//     world !"
 												this.writeCode(code.slice(this.index, chr.index));
 												this.index = chr.index + chr.size;
@@ -661,7 +660,7 @@ module.exports = {
 												};
 											} else if (this.isRegExpEnd) {
 												// Flags
-												var lowerChrAscii = unicode.codePointAt(chr.chr.toLowerCase(), 0).codePoint;
+												const lowerChrAscii = unicode.codePointAt(chr.chr.toLowerCase(), 0).codePoint;
 												if ((lowerChrAscii < 97) || (lowerChrAscii > 122)) { // "a", "z"
 													this.isRegExpEnd = false;
 													this.isRegExp = false;
@@ -762,7 +761,7 @@ module.exports = {
 												if (this.options.keepSpaces) {
 													this.writeToken();
 												};
-												var lastIndex = null;
+												let lastIndex = null;
 												this.index = chr.index;
 												doSpaces: do {
 													if (chr.codePoint === 59) { // ";"
@@ -799,7 +798,7 @@ module.exports = {
 												};
 												continue nextChar;
 											} else if ((chr.codePoint === 36) || (chr.codePoint === 95) || unicode.isAlnum(chr.chr, curLocale)) { // "$", "_", "{alnum}"
-												var token = '';
+												let token = '';
 												doAlnum: do {
 													token += chr.chr; // build new token
 													chr = chr.nextChar();
@@ -888,7 +887,7 @@ module.exports = {
 							},
 						};
 						
-						var knownDirectives = this.__knownDirectives,
+						const knownDirectives = this.__knownDirectives,
 							directives = state.directives;
 								
 						tools.forEach(knownDirectives, function(directive, name) {
@@ -934,8 +933,8 @@ module.exports = {
 					onWrite: doodad.OVERRIDE(function onWrite(ev) {
 						const retval = this._super(ev);
 
-						var data = ev.data;
-						var minifierState = this.__state;
+						const data = ev.data;
+						const minifierState = this.__state;
 
 						ev.preventDefault();
 
@@ -948,23 +947,25 @@ module.exports = {
 							};
 						});
 
-						var eof = (data.raw === io.EOF);
+						let dta;
+
+						const eof = (data.raw === io.EOF);
 
 						minifierState.parseCode(data.valueOf() || '', null, null, eof); // sync
 
 						if (minifierState.buffer) {
-							var data2 = this.transform({raw: minifierState.buffer});
+							dta = this.transform({raw: minifierState.buffer});
 							minifierState.buffer = '';
 							
 							pushState.count++;
-							this.push(data2, {callback: consumeCallback});
+							this.push(dta, {callback: consumeCallback});
 						};
 									
 						if (eof) {
 							this.__clearState();
-							var data2 = this.transform({raw: io.EOF});
+							dta = this.transform({raw: io.EOF});
 							pushState.count++;
-							this.push(data2, {callback: consumeCallback});
+							this.push(dta, {callback: consumeCallback});
 						};
 
 						if (this.options.flushMode === 'half') {
