@@ -938,38 +938,22 @@ module.exports = {
 
 						ev.preventDefault();
 
-						data.delayed = true;
-						const pushState = {count: 0};
-						const consumeCallback = doodad.AsyncCallback(this, function consume() {
-							pushState.count--;
-							if (pushState.count <= 0) {
-								this.__consumeData(data);
-							};
-						});
-
-						let dta;
-
 						const eof = (data.raw === io.EOF);
 
-						minifierState.parseCode(data.valueOf() || '', null, null, eof); // sync
+						minifierState.parseCode(this.transform(data) || '', null, null, eof); // sync
 
 						if (minifierState.buffer) {
-							dta = this.transform({raw: minifierState.buffer});
+							this.push(new io.TextData(minifierState.buffer), {callback: data.defer()});
 							minifierState.buffer = '';
-							
-							pushState.count++;
-							this.push(dta, {callback: consumeCallback});
 						};
 									
 						if (eof) {
 							this.__clearState();
-							dta = this.transform({raw: io.EOF});
-							pushState.count++;
-							this.push(dta, {callback: consumeCallback});
+							this.push(new io.Data(io.EOF), {callback: data.defer()});
 						};
 
 						if (this.options.flushMode === 'half') {
-							this.flush(this.options.autoFlushOptions);
+							this.flush();
 						};
 
 						return retval;
