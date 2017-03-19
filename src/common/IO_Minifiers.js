@@ -59,13 +59,12 @@ module.exports = {
 						
 
 				minifiers.REGISTER(io.Stream.$extend(
-									io.TextInputStream,
+									//io.TextInputStream,
 									io.TextOutputStream,
 				{
 					$TYPE_NAME: 'Javascript',
 					$TYPE_UUID: '' /*! INJECT('+' + TO_SOURCE(UUID('Javascript')), true) */,
 
-					__listening: doodad.PROTECTED(false),
 					__state: doodad.PROTECTED(null),
 
 					__knownDirectives: doodad.PROTECTED(doodad.ATTRIBUTE({
@@ -898,28 +897,9 @@ module.exports = {
 					}),
 							
 					reset: doodad.OVERRIDE(function reset() {
-						this.__listening = false;
 						this.__clearState();
 								
 						this._super();
-					}),
-
-					isListening: doodad.OVERRIDE(function() {
-						return this.__listening;
-					}),
-							
-					listen: doodad.OVERRIDE(function(/*optional*/options) {
-						if (!this.__listening) {
-							this.__listening = true;
-							this.onListen(new doodad.Event());
-						};
-					}),
-							
-					stopListening: doodad.OVERRIDE(function() {
-						if (this.__listening) {
-							this.__listening = false;
-							this.onStopListening(new doodad.Event());
-						};
 					}),
 
 					define: doodad.PUBLIC(function define(name, value) {
@@ -929,7 +909,7 @@ module.exports = {
 					undefine: doodad.PUBLIC(function undefine(name) {
 						this.__state.directives.UNDEFINE(name);
 					}),
-							
+					
 					onWrite: doodad.OVERRIDE(function onWrite(ev) {
 						const retval = this._super(ev);
 
@@ -950,10 +930,6 @@ module.exports = {
 						if (eof) {
 							this.__clearState();
 							this.push(new io.Data(io.EOF), {callback: data.defer()});
-						};
-
-						if (this.options.flushMode === 'half') {
-							this.flush();
 						};
 
 						return retval;
