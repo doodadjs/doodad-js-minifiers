@@ -923,13 +923,13 @@ module.exports = {
 						minifierState.parseCode(this.transform(data) || '', null, null, eof); // sync
 
 						if (minifierState.buffer) {
-							this.push(new io.TextData(minifierState.buffer), {callback: data.defer()});
+							this.submit(new io.TextData(minifierState.buffer));
 							minifierState.buffer = '';
 						};
 									
 						if (eof) {
 							this.__clearState();
-							this.push(new io.Data(io.EOF), {callback: data.defer()});
+							this.submit(new io.Data(io.EOF));
 						};
 
 						return retval;
