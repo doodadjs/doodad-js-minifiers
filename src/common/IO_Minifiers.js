@@ -59,8 +59,9 @@ module.exports = {
 						
 
 				minifiers.REGISTER(io.Stream.$extend(
-									//io.TextInputStream,
-									io.TextOutputStream,
+									io.BufferedTextOutputStream,
+									ioMixIns.TextTransformableIn,
+									ioMixIns.TextTransformableOut,
 				{
 					$TYPE_NAME: 'Javascript',
 					$TYPE_UUID: '' /*! INJECT('+' + TO_SOURCE(UUID('Javascript')), true) */,
@@ -920,16 +921,16 @@ module.exports = {
 
 						const eof = (data.raw === io.EOF);
 
-						minifierState.parseCode(this.transform(data) || '', null, null, eof); // sync
+						minifierState.parseCode(data.toString(), null, null, eof); // sync
 
 						if (minifierState.buffer) {
 							this.submit(new io.TextData(minifierState.buffer));
 							minifierState.buffer = '';
 						};
-									
+						
 						if (eof) {
 							this.__clearState();
-							this.submit(new io.Data(io.EOF));
+							this.submit(new io.TextData(io.EOF));
 						};
 
 						return retval;
