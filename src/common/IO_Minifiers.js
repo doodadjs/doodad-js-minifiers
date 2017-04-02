@@ -930,7 +930,7 @@ module.exports = {
 						
 						if (eof) {
 							this.__clearState();
-							this.submit(new io.TextData(io.EOF));
+							this.submit(new io.TextData(io.EOF), {callback: data.defer()});
 						};
 
 						return retval;
