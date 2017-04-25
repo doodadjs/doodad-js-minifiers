@@ -924,7 +924,7 @@ module.exports = {
 						minifierState.parseCode(data.toString(), null, null, eof); // sync
 
 						if (minifierState.buffer) {
-							this.submit(new io.TextData(minifierState.buffer));
+							this.submit(new io.TextData(minifierState.buffer), {callback: data.defer()});
 							minifierState.buffer = '';
 						};
 						
