@@ -839,7 +839,7 @@ module.exports = {
 												continue nextChar;
 											} else if ((chr.codePoint === 123) || (chr.codePoint === 40) || (chr.codePoint === 91)) { // "{", "(", "["
 												if (chr.codePoint === 40) { // "("
-													if (this.newLine) {
+													if (this.explicitSep || this.newLine) {
 														this.hasSep = false;
 													};
 												};
