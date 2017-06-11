@@ -133,7 +133,7 @@ module.exports = {
 							};
 						},
 						EVAL: function(expr) {
-							return safeEval.eval(expr, types.extend({global: global, root: root}, this.variables), null, null, true);
+							return safeEval.eval(expr, types.extend({global: global, root: root}, this.variables), {allowFunctions: true});
 						},
 						TO_SOURCE: function(val, /*optional*/depth) {
 							return types.toSource(val, depth);
