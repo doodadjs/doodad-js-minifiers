@@ -129,11 +129,11 @@ module.exports = {
 						VAR: function(key) {
 							const tmp = tools.split(key, /\.|\[/g, 2);
 							if (types.has(this.variables, tmp[0])) {
-								return safeEval.eval(key, this.variables)
+								return safeEval.eval(key, this.variables);
 							};
 						},
 						EVAL: function(expr) {
-							return safeEval.eval(expr, types.extend({global: global, root: root}, this.variables), {allowFunctions: true});
+							return safeEval.eval(expr, types.extend({global: global, root: root}, this.variables), {allowFunctions: true, allowRegExp: true});
 						},
 						TO_SOURCE: function(val, /*optional*/depth) {
 							return types.toSource(val, depth);
@@ -480,7 +480,7 @@ module.exports = {
 										let evaled = false;
 										if (tools.indexOf(this.beginMemorizeDirectives, name) >= 0) {
 											if (this.memorize === 0) {
-												safeEval.eval(directive, this.directives);
+												safeEval.eval(directive, this.directives, null, {allowRegExp: true});
 												evaled = true;
 											};
 											this.memorize++;
@@ -491,7 +491,7 @@ module.exports = {
 											if (this.memorize > 0) {
 												this.memorizedCode += '/*!' + directive + '*/';
 											} else {
-												safeEval.eval(directive, this.directives);
+												safeEval.eval(directive, this.directives, null, {allowRegExp: true});
 											};
 										};
 									};
