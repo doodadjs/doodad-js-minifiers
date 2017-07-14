@@ -480,7 +480,11 @@ module.exports = {
 										let evaled = false;
 										if (tools.indexOf(this.beginMemorizeDirectives, name) >= 0) {
 											if (this.memorize === 0) {
-												safeEval.eval(directive, this.directives, null, {allowRegExp: true});
+												try {
+													safeEval.eval(directive + "ALLO", this.directives, null, {allowRegExp: true});
+												} catch(ex) {
+													throw new types.ParseError("The directive '~0~' has failed to execute : ~1~", [directive, ex]);
+												};
 												evaled = true;
 											};
 											this.memorize++;
@@ -491,7 +495,11 @@ module.exports = {
 											if (this.memorize > 0) {
 												this.memorizedCode += '/*!' + directive + '*/';
 											} else {
-												safeEval.eval(directive, this.directives, null, {allowRegExp: true});
+												try {
+													safeEval.eval(directive + "ALLO", this.directives, null, {allowRegExp: true});
+												} catch(ex) {
+													throw new types.ParseError("The directive '~0~' has failed to execute : ~1~", [directive, ex]);
+												};
 											};
 										};
 									};
