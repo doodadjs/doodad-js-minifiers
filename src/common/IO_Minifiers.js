@@ -58,6 +58,8 @@ module.exports = {
 				});
 						
 
+				// TODO: Implements "io.BufferedTextInputStream"
+
 				minifiers.REGISTER(io.Stream.$extend(
 									io.BufferedTextOutputStream,
 									ioMixIns.TextTransformableIn,
@@ -258,12 +260,13 @@ module.exports = {
 								throw new types.Error("Invalid 'END_REMOVE' directive.");
 							};
 						},
-						FOR_EACH: function(iter, varName) {
+						FOR_EACH: function(iter, itemName, /*optional*/keyName) {
 							this.writeToken();
 							this.pushDirective({
 								name: 'FOR',
 								iter: iter,
-								varName: varName,
+								itemName: itemName,
+								keyName: keyName,
 							});
 						},
 						END_FOR: function() {
@@ -273,12 +276,13 @@ module.exports = {
 							};
 							const memorizedCode = this.memorizedCode;
 							this.memorizedCode = '';
-							if (memorizedCode) {
+							if (memorizedCode && block.iter) {
 								if (this.directives.IS_DEF(block.varName)) {
 									throw new types.Error("Variable '~0~' already defined.", [block.varName]);
 								};
-								tools.forEach(block.iter, function(item) {
-									this.directives.DEFINE(block.varName, item);
+								tools.forEach(block.iter, function(item, key) {
+									this.directives.DEFINE(block.itemName, item);
+									block.KeyName && this.directives.DEFINE(block.KeyName, key);
 									this.directives.INJECT(memorizedCode);
 								}, this);
 								this.directives.UNDEFINE(block.varName);
@@ -299,12 +303,12 @@ module.exports = {
 							};
 							const memorizedCode = this.memorizedCode;
 							this.memorizedCode = '';
-							if (memorizedCode) {
+							const ar = block.array,
+								arLen = (ar ? ar.length : 0);
+							if (memorizedCode && (arLen > 0)) {
 								if (this.directives.IS_DEF(block.varName)) {
 									throw new types.Error("Variable '~0~' already defined.", [block.varName]);
 								};
-								const ar = block.array,
-									arLen = ar.length;
 								for (let i = 0; i < arLen; i++) {
 									if (types.has(ar, i)) {
 										this.directives.DEFINE(block.varName, ar[i]);
