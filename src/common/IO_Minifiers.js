@@ -52,7 +52,7 @@ module.exports = {
 				//const __Internal__ = {
 				//};
 						
-				types.complete(_shared.Natives, {
+				tools.complete(_shared.Natives, {
 					mathMax: global.Math.max,
 					mathMin: global.Math.min,
 				});
@@ -113,7 +113,7 @@ module.exports = {
 								if (!block.remove) {
 									this.directives.INJECT(memorizedCode);
 								};
-								types.extend(this.variables, mem.tmp);
+								tools.extend(this.variables, mem.tmp);
 							};
 						},
 						IS_DEF: function(key) {
@@ -135,10 +135,10 @@ module.exports = {
 							};
 						},
 						EVAL: function(expr) {
-							return safeEval.eval(expr, types.extend({global: global, root: root}, this.variables), {allowFunctions: true, allowRegExp: true});
+							return safeEval.eval(expr, tools.extend({global: global, root: root}, this.variables), {allowFunctions: true, allowRegExp: true});
 						},
 						TO_SOURCE: function(val, /*optional*/depth) {
-							return types.toSource(val, depth);
+							return tools.toSource(val, depth);
 						},
 						INJECT: function(code, /*optional*/raw) {
 							code = types.toString(code) + (raw ? '' : '\n');
@@ -396,7 +396,7 @@ module.exports = {
 								this.isDo = false;
 							},
 							popLevel: function popLevel(name) {
-								const level = this.levelStack.pop() || types.nullObject();
+								const level = this.levelStack.pop() || tools.nullObject();
 								// TODO: if (name !== level.name) { ??? };
 								this.isTemplate = !!level.isTemplate;
 								this.isTemplateExpression = !!level.isTemplateExpression;
