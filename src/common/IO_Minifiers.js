@@ -71,13 +71,13 @@ module.exports = {
 					__state: doodad.PROTECTED(null),
 
 					__knownDirectives: doodad.PROTECTED(doodad.ATTRIBUTE({
-						DEFINE: function(key, /*optional*/value) {
+						DEFINE: function DEFINE(key, /*optional*/value) {
 							this.variables[key] = value;
 						},
-						UNDEFINE: function(key) {
+						UNDEFINE: function UNDEFINE(key) {
 							delete this.variables[key];
 						},
-						BEGIN_DEFINE: function(removeBlock) {
+						BEGIN_DEFINE: function BEGIN_DEFINE(removeBlock) {
 							/*
 								ex: 
 									//! BEGIN_DEFINE()
@@ -93,7 +93,7 @@ module.exports = {
 								remove: removeBlock,
 							});
 						},
-						END_DEFINE: function() {
+						END_DEFINE: function END_DEFINE() {
 							const block = this.popDirective();
 							if (!block || (block.name !== 'DEFINE')) {
 								throw new types.Error("Invalid 'END_DEFINE' directive.");
@@ -116,82 +116,70 @@ module.exports = {
 								tools.extend(this.variables, mem.tmp);
 							};
 						},
-						IS_DEF: function(key) {
+						IS_DEF: function IS_DEF(key) {
 							return types.has(this.variables, key);
 						},
-						IS_UNDEF: function(key) {
+						IS_UNDEF: function IS_UNDEF(key) {
 							return !types.has(this.variables, key);
 						},
-						IS_SET: function(key) {
+						IS_SET: function IS_SET(key) {
 							return !!types.get(this.variables, key, false);
 						},
-						IS_UNSET: function(key) {
+						IS_UNSET: function IS_UNSET(key) {
 							return !types.get(this.variables, key, false);
 						},
-						VAR: function(key) {
+						VAR: function VAR(key) {
 							const tmp = tools.split(key, /\.|\[/g, 2);
 							if (types.has(this.variables, tmp[0])) {
 								return safeEval.eval(key, this.variables);
 							};
 						},
-						EVAL: function(expr) {
+						EVAL: function EVAL(expr) {
 							return safeEval.eval(expr, tools.extend({global: global, root: root}, this.variables), {allowFunctions: true, allowRegExp: true});
 						},
-						TO_SOURCE: function(val, /*optional*/depth) {
+						TO_SOURCE: function TO_SOURCE(val, /*optional*/depth) {
 							return tools.toSource(val, depth);
 						},
-						INJECT: function(code, /*optional*/raw) {
-							code = types.toString(code) + (raw ? '' : '\n');
+						INJECT: function INJECT(code, /*optional*/raw) {
+							code = types.toString(code);
 							if (raw) {
 								this.writeToken();
 								this.writeCode(code);
 							} else {
-								//const isDirective = this.isDirective,
-								//	isDirectiveBlock = this.isDirectiveBlock,
-								//	directive = this.directive;
-												
-								this.isDirective = false;
-								this.isDirectiveBlock = false;
-								this.directive = '';
-												
-								this.parseCode(code);
-											
-								//this.isDirective = isDirective;
-								//this.isDirectiveBlock = isDirectiveBlock;
-								//this.directive = directive;
+								this.parseCode(code + " ");
 							};
 						},
-						IF: function(val) {
+						IF: function IF(val) {
 							this.pushDirective({
 								name: 'IF',
 								remove: !val,
 							});
 						},
-						IF_DEF: function(key) {
+						IF_DEF: function IF_DEF(key) {
 							this.pushDirective({
 								name: 'IF',
 								remove: !types.has(this.variables, key),
 							});
 						},
-						IF_UNDEF: function(key) {
+						IF_UNDEF: function IF_UNDEF(key) {
 							this.pushDirective({
 								name: 'IF',
 								remove: types.has(this.variables, key),
 							});
 						},
-						IF_SET: function(key) {
+						IF_SET: function IF_SET(key) {
 							this.pushDirective({
 								name: 'IF',
 								remove: !types.get(this.variables, key, false),
 							});
 						},
-						IF_UNSET: function(key) {
+						IF_UNSET: function IF_UNSET(key) {
 							this.pushDirective({
 								name: 'IF',
 								remove: !!types.get(this.variables, key, false),
 							});
 						},
-						ELSE: function() {
+						ELSE: function ELSE() {
 							const block = this.popDirective();
 							if (!block || (block.name !== 'IF')) {
 								throw new types.Error("Invalid 'ELSE' directive.");
@@ -201,7 +189,7 @@ module.exports = {
 								remove: !block.remove,
 							});
 						},
-						ELSE_IF: function(expr) {
+						ELSE_IF: function ELSE_IF(expr) {
 							const block = this.popDirective();
 							if (!block || (block.name !== 'IF')) {
 								throw new types.Error("Invalid 'ELSE_IF' directive.");
@@ -211,13 +199,13 @@ module.exports = {
 								remove: !block.remove || !expr,
 							});
 						},
-						END_IF: function() {
+						END_IF: function END_IF() {
 							const block = this.popDirective();
 							if (!block || (block.name !== 'IF')) {
 								throw new types.Error("Invalid 'END_IF' directive.");
 							};
 						},
-						REPLACE_BY: function(code, /*optional*/raw) {
+						REPLACE_BY: function REPLACE_BY(code, /*optional*/raw) {
 							this.pushDirective({
 								name: 'REPLACE',
 								remove: true,
@@ -225,7 +213,7 @@ module.exports = {
 								raw: raw,
 							});
 						},
-						REPLACE_IF: function(condition, code, /*optional*/raw) {
+						REPLACE_IF: function REPLACE_IF(condition, code, /*optional*/raw) {
 							this.pushDirective({
 								name: 'REPLACE',
 								remove: !!condition,
@@ -233,7 +221,7 @@ module.exports = {
 								raw: raw,
 							});
 						},
-						END_REPLACE: function() {
+						END_REPLACE: function END_REPLACE() {
 							const block = this.popDirective();
 							if (!block || (block.name !== 'REPLACE')) {
 								throw new types.Error("Invalid 'END_REPLACE' directive.");
@@ -242,25 +230,25 @@ module.exports = {
 								this.directives.INJECT(block.code, block.raw);
 							};
 						},
-						BEGIN_REMOVE: function() {
+						BEGIN_REMOVE: function BEGIN_REMOVE() {
 							this.pushDirective({
 								name: 'REMOVE',
 								remove: true,
 							});
 						},
-						REMOVE_IF: function(condition) {
+						REMOVE_IF: function REMOVE_IF(condition) {
 							this.pushDirective({
 								name: 'REMOVE',
 								remove: !!condition,
 							});
 						},
-						END_REMOVE: function() {
+						END_REMOVE: function END_REMOVE() {
 							const block = this.popDirective();
 							if (!block || (block.name !== 'REMOVE')) {
 								throw new types.Error("Invalid 'END_REMOVE' directive.");
 							};
 						},
-						FOR_EACH: function(iter, itemName, /*optional*/keyName) {
+						FOR_EACH: function FOR_EACH(iter, itemName, /*optional*/keyName) {
 							this.writeToken();
 							this.pushDirective({
 								name: 'FOR',
@@ -269,7 +257,7 @@ module.exports = {
 								keyName: keyName,
 							});
 						},
-						END_FOR: function() {
+						END_FOR: function END_FOR() {
 							const block = this.popDirective();
 							if (!block || (block.name !== 'FOR')) {
 								throw new types.Error("Invalid 'END_FOR' directive.");
@@ -277,18 +265,26 @@ module.exports = {
 							const memorizedCode = this.memorizedCode;
 							this.memorizedCode = '';
 							if (memorizedCode && block.iter) {
-								if (this.directives.IS_DEF(block.varName)) {
-									throw new types.Error("Variable '~0~' already defined.", [block.varName]);
+								if (this.directives.IS_DEF(block.itemName)) {
+									throw new types.Error("Variable '~0~' already defined.", [block.itemName]);
+								};
+								if (block.keyName && this.directives.IS_DEF(block.keyName)) {
+									throw new types.Error("Variable '~0~' already defined.", [block.keyName]);
 								};
 								tools.forEach(block.iter, function(item, key) {
 									this.directives.DEFINE(block.itemName, item);
-									block.KeyName && this.directives.DEFINE(block.KeyName, key);
+									if (block.keyName) {
+										this.directives.DEFINE(block.keyName, key);
+									};
 									this.directives.INJECT(memorizedCode);
 								}, this);
-								this.directives.UNDEFINE(block.varName);
+								this.directives.UNDEFINE(block.itemName);
+								if (block.keyName) {
+									this.directives.UNDEFINE(block.keyName);
+								};
 							};
 						},
-						MAP: function(ar, varName) {
+						MAP: function MAP(ar, varName) {
 							this.writeToken();
 							this.pushDirective({
 								name: 'MAP',
@@ -296,7 +292,7 @@ module.exports = {
 								varName: varName,
 							});
 						},
-						END_MAP: function() {
+						END_MAP: function END_MAP() {
 							const block = this.popDirective();
 							if (!block || (block.name !== 'MAP')) {
 								throw new types.Error("Invalid 'END_MAP' directive.");
@@ -312,7 +308,10 @@ module.exports = {
 								for (let i = 0; i < arLen; i++) {
 									if (types.has(ar, i)) {
 										this.directives.DEFINE(block.varName, ar[i]);
-										this.directives.INJECT(memorizedCode + (i < arLen - 1 ? ',' : ''));
+										this.directives.INJECT(memorizedCode);
+										if (i < (arLen - 1)) {
+											this.directives.INJECT(',');
+										};
 									};
 								};
 								this.directives.UNDEFINE(block.varName);
@@ -458,6 +457,13 @@ module.exports = {
 							writeCode: function writeCode(code) {
 								if (this.memorize > 0) {
 									this.memorizedCode += code;
+									if (this.newLine) {
+										this.memorizedCode += this.options.newLine;
+										this.newLine = false;
+									} else if (this.sep) {
+										this.memorizedCode += this.sep;
+										this.sep = '';
+									};
 								} else if (!this.getDirective().remove) {
 									this.buffer += code;
 								};
@@ -497,6 +503,7 @@ module.exports = {
 										};
 										if (!evaled) {
 											if (this.memorize > 0) {
+												this.writeToken();
 												this.memorizedCode += '/*!' + directive + '*/';
 											} else {
 												try {
@@ -510,19 +517,15 @@ module.exports = {
 								};
 							},
 
-							parseCode: function(code, /*optional*/start, /*optional*/end, /*optional*/eof) {
+							parseCode: function(code, /*optional*/start, /*optional*/end) {
 								const curLocale = locale.getCurrent();
 
 								code = (this.prevChr || '') + (code || '');
 								this.prevChr = '';
 
-								if (eof) {
-									code = tools.trim(tools.trim(code, '\n', -1, 1), '\r', -1, 1) + this.options.newLine;
-								};
-								
 								this.index = (types.isNothing(start) ? 0 : _shared.Natives.mathMax(start, 0));
 								end = (types.isNothing(end) ? code.length : _shared.Natives.mathMin(end, code.length));
-										
+
 								analyseChunk: while (this.index < end) {
 									let chr = unicode.nextChar(code, this.index, end);
 									if (this.isDirective || this.isDirectiveBlock) {
@@ -532,8 +535,8 @@ module.exports = {
 												break analyseChunk;
 											};
 											if (this.isDirectiveBlock && ((this.prevChr + chr.chr) === '*/')) {
-												this.isDirectiveBlock = false;
 												this.prevChr = '';
+												this.isDirectiveBlock = false;
 												const directive = this.directive;
 												this.directive = '';
 												this.runDirective(directive);
@@ -547,12 +550,16 @@ module.exports = {
 												// Wait next char
 												this.prevChr = chr.chr;
 											} else if ((chr.chr === '\n') || (chr.chr === '\r')) {
-												this.isDirective = false;
 												this.prevChr = '';
+												this.isDirective = false;
+												const isDirectiveBlock = this.isDirectiveBlock;
+												this.isDirectiveBlock = false;
 												const directive = this.directive;
 												this.directive = '';
 												this.runDirective(directive);
-												if (!this.isDirectiveBlock) {
+												if (isDirectiveBlock) {
+													this.isDirectiveBlock = true;
+												} else {
 													this.index = chr.index + chr.size;
 													continue analyseChunk;
 												};
@@ -821,32 +828,30 @@ module.exports = {
 														};
 													} else {
 														this.prevChr = token;
-														break doAlnum;
+														break analyseChunk;
 													};
 												} while ((chr.codePoint === 36) || (chr.codePoint === 95) || unicode.isAlnum(chr.chr, curLocale)); // "$", "_", "{alnum}"
-												if (chr) {
-													if (token === 'for') {
-														this.isFor = true;
-													} else if (token === 'do') {
-														this.isDo = true;
-													} else {
-														if (this.endBrace && ((['else', 'catch', 'finally', 'until'].indexOf(token) >= 0) || (this.isDo && (token === 'while')))) {
-															// No separator before these keywords
-															this.hasSep = true;
-														};
-														this.isDo = this.isFor = false;
+												if (token === 'for') {
+													this.isFor = true;
+												} else if (token === 'do') {
+													this.isDo = true;
+												} else {
+													if (this.endBrace && ((['else', 'catch', 'finally', 'until'].indexOf(token) >= 0) || (this.isDo && (token === 'while')))) {
+														// No separator before these keywords
+														this.hasSep = true;
 													};
-													if (this.token || this.explicitSep || this.newLine) {
-														if (this.token || this.explicitSep) {
-															this.hasSep = false;
-														};
-														if (this.newLine) {
-															this.sep = ';';
-														};
-														this.writeToken(); // write current token and separator
-													};
-													this.token = token;
+													this.isDo = this.isFor = false;
 												};
+												if (this.token || this.explicitSep || this.newLine) {
+													if (this.token || this.explicitSep) {
+														this.hasSep = false;
+													};
+													if (this.newLine) {
+														this.sep = ';';
+													};
+													this.writeToken(); // write current token and separator
+												};
+												this.token = token;
 												this.ignoreRegExp = false;
 												continue nextChar;
 											} else if ((chr.codePoint === 123) || (chr.codePoint === 40) || (chr.codePoint === 91)) { // "{", "(", "["
@@ -933,7 +938,12 @@ module.exports = {
 
 						const eof = (data.raw === io.EOF);
 
-						minifierState.parseCode(data.toString(), null, null, eof); // sync
+						minifierState.parseCode(data.toString()); // sync
+
+						if (eof) {
+							minifierState.parseCode(this.options.newLine); // sync
+							minifierState.writeToken();
+						};
 
 						if (minifierState.buffer) {
 							this.submit(new io.TextData(minifierState.buffer), {callback: data.defer()});
