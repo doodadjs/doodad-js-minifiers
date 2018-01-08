@@ -492,7 +492,7 @@ exports.add = function add(DD_MODULES) {
 											try {
 												safeEval.eval(directive, this.directives, null, {allowRegExp: true});
 											} catch(ex) {
-												throw new types.ParseError("The directive '~0~' has failed to execute : ~1~", [directive, ex]);
+												throw new types.ParseError("The directive '~0~' has failed to execute : ~1~", [directive, ex.stack]);
 											};
 											evaled = true;
 										};
@@ -508,7 +508,7 @@ exports.add = function add(DD_MODULES) {
 											try {
 												safeEval.eval(directive, this.directives, null, {allowRegExp: true});
 											} catch(ex) {
-												throw new types.ParseError("The directive '~0~' has failed to execute : ~1~", [directive, ex]);
+												throw new types.ParseError("The directive '~0~' has failed to execute : ~1~", [directive, ex.stack]);
 											};
 										};
 									};
