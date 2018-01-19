@@ -32,7 +32,7 @@ exports.add = function add(DD_MODULES) {
 			"use strict";
 
 			const doodad = root.Doodad,
-				mixIns = doodad.MixIns,
+				//mixIns = doodad.MixIns,
 				types = doodad.Types,
 				tools = doodad.Tools,
 				safeEval = tools.SafeEval,
@@ -40,11 +40,11 @@ exports.add = function add(DD_MODULES) {
 				unicode = tools.Unicode,
 				io = doodad.IO,
 				ioMixIns = io.MixIns,
-				ioInterfaces = io.Interfaces,
+				//ioInterfaces = io.Interfaces,
 				extenders = doodad.Extenders,
-				nodejs = doodad.NodeJs,
-				nodejsIO = nodejs && nodejs.IO,
-				nodejsIOInterfaces = nodejsIO && nodejsIO.Interfaces,
+				//nodejs = doodad.NodeJs,
+				//nodejsIO = nodejs && nodejs.IO,
+				//nodejsIOInterfaces = nodejsIO && nodejsIO.Interfaces,
 				minifiers = io.Minifiers;
 
 							
@@ -618,7 +618,7 @@ exports.add = function add(DD_MODULES) {
 									};
 									break analyseChunk;
 								} else if (this.isString || this.isTemplate) {
-									nextChar: while (chr) {
+									while (chr) {
 										if (!chr.complete) {
 											// Incomplete Unicode sequence
 											break analyseChunk;
@@ -804,7 +804,7 @@ exports.add = function add(DD_MODULES) {
 												} else {
 													break doSpaces;
 												};
-											} while ((chr.codePoint === 59) || unicode.isSpace(chr.chr, curLocale)) // ";", "{space}"
+											} while ((chr.codePoint === 59) || unicode.isSpace(chr.chr, curLocale)); // ";", "{space}"
 											if (this.options.keepSpaces) {
 												this.explicitSep = false;
 												this.sep = '';
@@ -817,7 +817,7 @@ exports.add = function add(DD_MODULES) {
 											continue nextChar;
 										} else if ((chr.codePoint === 36) || (chr.codePoint === 95) || unicode.isAlnum(chr.chr, curLocale)) { // "$", "_", "{alnum}"
 											let token = '';
-											doAlnum: do {
+											do {
 												token += chr.chr; // build new token
 												chr = chr.nextChar();
 												if (chr) {
@@ -957,7 +957,6 @@ exports.add = function add(DD_MODULES) {
 					return retval;
 				}),
 			}));
-							
 							
 							
 			//return function init(/*optional*/options) {
