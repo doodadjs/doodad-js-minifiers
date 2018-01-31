@@ -333,7 +333,24 @@ exports.add = function add(DD_MODULES) {
 					'END_MAP',
 				], extenders.UniqueArray)),
 
-	
+				__endBraceKeywords: doodad.PROTECTED(doodad.ATTRIBUTE([
+					'else',
+					'catch',
+					'finally',
+					'until'
+				], extenders.UniqueArray)),
+				
+				__keywordsFollowingDoKeyword: doodad.PROTECTED(doodad.ATTRIBUTE([
+					'while',
+				], extenders.UniqueArray)),
+				
+				__noSemiKeywords: doodad.PROTECTED(doodad.ATTRIBUTE([
+					'var',
+					'let',
+					'const',
+				], extenders.UniqueArray)),
+
+				
 				setOptions: doodad.OVERRIDE(function setOptions(options) {
 					types.getDefault(options, 'runDirectives', types.getIn(this.options, 'runDirectives', false));
 					types.getDefault(options, 'keepComments', types.getIn(this.options, 'keepComments', false));
@@ -346,9 +363,8 @@ exports.add = function add(DD_MODULES) {
 				__clearState: doodad.PROTECTED(function() {
 					const state = {
 						index: 0,
+						minifier: this,
 						options: this.options,
-						beginMemorizeDirectives: this.__beginMemorizeDirectives,
-						endMemorizeDirectives: this.__endMemorizeDirectives,
 						variables: {},
 						directives: {},
 									
@@ -490,7 +506,7 @@ exports.add = function add(DD_MODULES) {
 								if (directive) {
 									const name = tools.split(directive, '(', 2)[0].trim();
 									let evaled = false;
-									if (tools.indexOf(this.beginMemorizeDirectives, name) >= 0) {
+									if (tools.indexOf(this.minifier.__beginMemorizeDirectives, name) >= 0) {
 										if (this.memorize === 0) {
 											try {
 												safeEval.eval(directive, this.directives, null, {allowRegExp: true});
@@ -500,7 +516,7 @@ exports.add = function add(DD_MODULES) {
 											evaled = true;
 										};
 										this.memorize++;
-									} else if (tools.indexOf(this.endMemorizeDirectives, name) >= 0) {
+									} else if (tools.indexOf(this.minifier.__endMemorizeDirectives, name) >= 0) {
 										this.memorize--;
 									};
 									if (!evaled) {
@@ -838,8 +854,7 @@ exports.add = function add(DD_MODULES) {
 											} else if (token === 'do') {
 												this.isDo = true;
 											} else {
-												if (this.endBrace && ((['else', 'catch', 'finally', 'until'].indexOf(token) >= 0) || (this.isDo && (token === 'while')))) {
-													// No separator before these keywords
+												if (this.endBrace && ((this.minifier.__endBraceKeywords.indexOf(token) >= 0) || (this.isDo && (this.minifier.__keywordsFollowingDoKeyword.indexOf(token) >= 0)))) {
 													this.hasSep = true;
 												};
 												this.isDo = this.isFor = false;
@@ -848,7 +863,9 @@ exports.add = function add(DD_MODULES) {
 												if (this.token || this.explicitSep) {
 													this.hasSep = false;
 												};
-												if (this.newLine) {
+												if (this.minifier.__noSemiKeywords.indexOf(this.token) >= 0) {
+													this.sep = ' ';
+												} else if (this.newLine) {
 													this.sep = ';';
 												};
 												this.writeToken(); // write current token and separator
