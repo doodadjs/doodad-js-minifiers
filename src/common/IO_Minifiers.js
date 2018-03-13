@@ -478,9 +478,6 @@ exports.add = function add(DD_MODULES) {
 								if (this.newLine) {
 									this.memorizedCode += this.options.newLine;
 									this.newLine = false;
-								} else if (this.sep) {
-									this.memorizedCode += this.sep;
-									this.sep = '';
 								};
 							} else if (!this.getDirective().remove) {
 								this.buffer += code;
@@ -517,11 +514,12 @@ exports.add = function add(DD_MODULES) {
 										};
 										this.memorize++;
 									} else if (tools.indexOf(this.minifier.__endMemorizeDirectives, name) >= 0) {
+										this.writeToken(false);
 										this.memorize--;
 									};
 									if (!evaled) {
 										if (this.memorize > 0) {
-											this.writeToken();
+											this.writeToken(false);
 											this.memorizedCode += '/*!' + directive + '*/';
 										} else {
 											try {
@@ -529,6 +527,7 @@ exports.add = function add(DD_MODULES) {
 											} catch(ex) {
 												throw new types.ParseError("The directive '~0~' has failed to execute : ~1~", [directive, ex.stack]);
 											};
+											//evaled = true;
 										};
 									};
 								};
@@ -961,7 +960,7 @@ exports.add = function add(DD_MODULES) {
 
 					if (eof) {
 						minifierState.parseCode(this.options.newLine); // sync
-						minifierState.writeToken();
+						minifierState.writeToken(false);
 					};
 
 					if (minifierState.buffer) {
