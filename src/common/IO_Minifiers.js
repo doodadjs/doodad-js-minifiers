@@ -595,6 +595,7 @@ exports.add = function add(DD_MODULES) {
 										if ((chr.chr === '\n') || (chr.chr === '\r')) {
 											this.isComment = false;
 											if (this.options.keepComments) {
+												this.writeToken(false);
 												this.writeCode(code.slice(this.index, chr.index + chr.size));
 												this.index = chr.index + chr.size;
 											} else {
@@ -605,6 +606,7 @@ exports.add = function add(DD_MODULES) {
 										chr = chr.nextChar();
 									};
 									if (!chr && this.options.keepComments) {
+										this.writeToken(false);
 										this.writeCode(code.slice(this.index));
 									};
 									break analyseChunk;
@@ -618,6 +620,7 @@ exports.add = function add(DD_MODULES) {
 											this.prevChr = '';
 											this.isCommentBlock = false;
 											if (this.options.keepComments) {
+												this.writeToken(false);
 												this.writeCode(code.slice(this.index, chr.index + chr.size));
 											};
 											this.index = chr.index + chr.size;
@@ -632,6 +635,7 @@ exports.add = function add(DD_MODULES) {
 										chr = chr.nextChar();
 									};
 									if (!chr && this.options.keepComments) {
+										this.writeToken(false);
 										this.writeCode(code.slice(this.index));
 									};
 									break analyseChunk;
@@ -809,6 +813,9 @@ exports.add = function add(DD_MODULES) {
 													};
 												} else if ((chr.codePoint === 10) || (chr.codePoint === 13)) { // CR/LF
 													this.newLine = true;
+													if (this.token) {
+														this.hasSep = false;
+													};
 												} else if (!this.sep) { // Other {space}
 													this.sep = ' ';
 												};
