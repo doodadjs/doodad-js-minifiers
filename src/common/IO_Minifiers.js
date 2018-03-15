@@ -89,7 +89,7 @@ exports.add = function add(DD_MODULES) {
 									...
 								//! END_DEFINE()
 						*/
-						this.writeToken();
+						this.writeToken(false);
 						this.pushDirective({
 							name: 'DEFINE',
 							remove: removeBlock,
@@ -145,7 +145,7 @@ exports.add = function add(DD_MODULES) {
 					INJECT: function INJECT(code, /*optional*/raw) {
 						code = types.toString(code);
 						if (raw) {
-							this.writeToken();
+							this.writeToken(false);
 							this.writeCode(code);
 						} else {
 							this.parseCode(code + " ");
@@ -251,7 +251,7 @@ exports.add = function add(DD_MODULES) {
 						};
 					},
 					FOR_EACH: function FOR_EACH(iter, itemName, /*optional*/keyName) {
-						this.writeToken();
+						this.writeToken(false);
 						this.pushDirective({
 							name: 'FOR',
 							iter: iter,
@@ -287,7 +287,7 @@ exports.add = function add(DD_MODULES) {
 						};
 					},
 					MAP: function MAP(ar, varName) {
-						this.writeToken();
+						this.writeToken(false);
 						this.pushDirective({
 							name: 'MAP',
 							array: ar,
@@ -751,14 +751,14 @@ exports.add = function add(DD_MODULES) {
 											};
 											continue analyseChunk;
 										} else if (!this.token && !this.ignoreRegExp && (this.prevChr === '/')) {
-											this.writeToken();
+											this.writeToken(false);
 											this.writeCode('/');
 											this.prevChr = '';
 											this.isRegExp = true;
 											this.index = chr.index;
 											continue analyseChunk;
 										} else if (((chr.codePoint === 43) || (chr.codePoint === 45)) && ((this.prevChr + chr.chr) === (chr.chr + chr.chr))) { // "++", "--"
-											this.writeToken();
+											this.writeToken(false);
 											this.prevChr = '';
 											this.writeCode(chr.chr + chr.chr);
 											this.ignoreRegExp = false;
@@ -776,7 +776,7 @@ exports.add = function add(DD_MODULES) {
 											chr = chr.nextChar();
 											continue nextChar;
 										} else if ((chr.codePoint === 34) || (chr.codePoint === 39)) { // '"', "'"
-											this.writeToken();
+											this.writeToken(false);
 											this.isString = true;
 											this.stringChr = chr.chr;
 											this.writeCode(chr.chr);
@@ -784,7 +784,7 @@ exports.add = function add(DD_MODULES) {
 											this.ignoreRegExp = false;
 											continue analyseChunk;
 										} else if (chr.codePoint === 96) { // "`"
-											this.writeToken();
+											this.writeToken(false);
 											this.isTemplate = true;
 											this.stringChr = chr.chr;
 											this.writeCode(chr.chr);
@@ -795,7 +795,7 @@ exports.add = function add(DD_MODULES) {
 												this.ignoreRegExp = true;
 											};
 											if (this.options.keepSpaces) {
-												this.writeToken();
+												this.writeToken(false);
 											};
 											let lastIndex = null;
 											this.index = chr.index;
@@ -805,7 +805,7 @@ exports.add = function add(DD_MODULES) {
 													this.explicitSep = true;
 													if (!this.options.keepSpaces && this.isForArguments) {
 														this.hasSep = false;
-														this.writeToken();
+														this.writeToken(false);
 													};
 												} else if ((chr.codePoint === 10) || (chr.codePoint === 13)) { // CR/LF
 													this.newLine = true;
@@ -867,7 +867,7 @@ exports.add = function add(DD_MODULES) {
 												} else if (this.newLine) {
 													this.sep = ';';
 												};
-												this.writeToken(); // write current token and separator
+												this.writeToken(false); // write current token and separator
 											};
 											this.token = token;
 											this.ignoreRegExp = false;
