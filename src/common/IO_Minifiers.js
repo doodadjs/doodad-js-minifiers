@@ -798,7 +798,7 @@ exports.add = function add(modules) {
 											if (this.token) {
 												this.ignoreRegExp = true;
 											};
-											if (this.options.keepSpaces) {
+											if (this.options.keepSpaces || (this.memorize > 0)) {
 												this.writeToken(false);
 											};
 											let lastIndex = null;
@@ -807,7 +807,7 @@ exports.add = function add(modules) {
 												if (chr.codePoint === 59) { // ";"
 													this.sep = ';';
 													this.explicitSep = true;
-													if (!this.options.keepSpaces && this.isForArguments) {
+													if (!(this.options.keepSpaces || (this.memorize > 0)) && this.isForArguments) {
 														this.hasSep = false;
 														this.writeToken(false);
 													};
@@ -830,7 +830,7 @@ exports.add = function add(modules) {
 													break doSpaces;
 												};
 											} while ((chr.codePoint === 59) || unicode.isSpace(chr.chr, curLocale)); // ";", "{space}"
-											if (this.options.keepSpaces) {
+											if (this.options.keepSpaces || (this.memorize > 0)) {
 												this.explicitSep = false;
 												this.sep = '';
 												this.hasSep = true;
