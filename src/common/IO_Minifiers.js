@@ -83,9 +83,8 @@ exports.add = function add(modules) {
 						/*
 							ex: 
 								//! BEGIN_DEFINE()
-									let a = 1;
+									const a = 1;
 									const b = '2';
-									var c = null;
 									...
 								//! END_DEFINE()
 						*/
@@ -108,7 +107,7 @@ exports.add = function add(modules) {
 							for (let i = 0; i < lines.length; i++) {
 								let line = lines[i];
 								if (line) {
-									line = line.replace(/^\s*(var\s|const\s|let\s)/, 'tmp.');
+									line = line.replace(/^\s*const\s+/, 'tmp.');
 									safeEval.eval(line, mem);
 								};
 							};
