@@ -336,7 +336,7 @@ exports.add = function add(modules) {
 					'else',
 					'catch',
 					'finally',
-					'until'
+					'until',
 				], extenders.UniqueArray)),
 				
 				__keywordsFollowingDoKeyword: doodad.PROTECTED(doodad.ATTRIBUTE([
@@ -797,7 +797,7 @@ exports.add = function add(modules) {
 											if (this.token) {
 												this.ignoreRegExp = true;
 											};
-											if (this.options.keepSpaces || (this.memorize > 0)) {
+											if (this.options.keepSpaces) {
 												this.writeToken(false);
 											};
 											let lastIndex = null;
@@ -806,7 +806,7 @@ exports.add = function add(modules) {
 												if (chr.codePoint === 59) { // ";"
 													this.sep = ';';
 													this.explicitSep = true;
-													if (!(this.options.keepSpaces || (this.memorize > 0)) && this.isForArguments) {
+													if (!this.options.keepSpaces && this.isForArguments) {
 														this.hasSep = false;
 														this.writeToken(false);
 													};
@@ -829,7 +829,7 @@ exports.add = function add(modules) {
 													break doSpaces;
 												};
 											} while ((chr.codePoint === 59) || unicode.isSpace(chr.chr, curLocale)); // ";", "{space}"
-											if (this.options.keepSpaces || (this.memorize > 0)) {
+											if (this.options.keepSpaces) {
 												this.explicitSep = false;
 												this.sep = '';
 												this.hasSep = true;
@@ -837,6 +837,9 @@ exports.add = function add(modules) {
 												this.writeCode(code.slice(this.index, lastIndex));
 												this.index = lastIndex;
 												continue analyseChunk;
+											} else if (this.memorize > 0) {
+												this.hasSep = false;
+												this.writeToken(false);
 											};
 											continue nextChar;
 										} else if ((chr.codePoint === 36) || (chr.codePoint === 95) || unicode.isAlnum(chr.chr, curLocale)) { // "$", "_", "{alnum}"
@@ -859,7 +862,7 @@ exports.add = function add(modules) {
 											} else if (token === 'do') {
 												this.isDo = true;
 											} else {
-												if (this.endBrace && ((this.minifier.__endBraceKeywords.indexOf(token) >= 0) || (this.isDo && (this.minifier.__keywordsFollowingDoKeyword.indexOf(token) >= 0)))) {
+												if (this.endBrace && ((this.sep === ' ') || (this.minifier.__endBraceKeywords.indexOf(token) >= 0) || (this.isDo && (this.minifier.__keywordsFollowingDoKeyword.indexOf(token) >= 0)))) {
 													this.hasSep = true;
 												};
 												this.isDo = this.isFor = false;
