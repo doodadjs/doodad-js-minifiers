@@ -50,15 +50,15 @@ exports.add = function add(modules) {
 				//nodejsIOInterfaces = nodejsIO && nodejsIO.Interfaces,
 				minifiers = io.Minifiers;
 
-							
+
 			//const __Internal__ = {
 			//};
-						
+
 			tools.complete(_shared.Natives, {
 				mathMax: global.Math.max,
 				mathMin: global.Math.min,
 			});
-						
+
 
 			// TODO: Implements "io.BufferedTextInputStream"
 
@@ -81,7 +81,7 @@ exports.add = function add(modules) {
 					},
 					BEGIN_DEFINE: function BEGIN_DEFINE(removeBlock) {
 						/*
-							ex: 
+							ex:
 								//! BEGIN_DEFINE()
 									const a = 1;
 									const b = '2';
@@ -319,7 +319,7 @@ exports.add = function add(modules) {
 						};
 					},
 				}, extenders.ExtendObject)),
-					
+
 				__beginMemorizeDirectives: doodad.PROTECTED(doodad.ATTRIBUTE([
 					'BEGIN_DEFINE',
 					'FOR_EACH',
@@ -338,18 +338,18 @@ exports.add = function add(modules) {
 					'finally',
 					'until',
 				], extenders.UniqueArray)),
-				
+
 				__keywordsFollowingDoKeyword: doodad.PROTECTED(doodad.ATTRIBUTE([
 					'while',
 				], extenders.UniqueArray)),
-				
+
 				__noSemiKeywords: doodad.PROTECTED(doodad.ATTRIBUTE([
 					'var',
 					'let',
 					'const',
 				], extenders.UniqueArray)),
 
-				
+
 				setOptions: doodad.OVERRIDE(function setOptions(options) {
 					types.getDefault(options, 'runDirectives', types.getIn(this.options, 'runDirectives', false));
 					types.getDefault(options, 'keepComments', types.getIn(this.options, 'keepComments', false));
@@ -358,7 +358,7 @@ exports.add = function add(modules) {
 
 					this._super(options);
 				}),
-							
+
 				__clearState: doodad.PROTECTED(function() {
 					const state = {
 						index: 0,
@@ -366,7 +366,7 @@ exports.add = function add(modules) {
 						options: this.options,
 						variables: {},
 						directives: {},
-									
+
 						isComment: false,
 						isCommentBlock: false,
 						isString: false,
@@ -377,17 +377,17 @@ exports.add = function add(modules) {
 						isCharSequence: false,
 						ignoreRegExp: false,
 						isEscaped: false,
-									
+
 						buffer: '',
 						prevChr: '',
-									
+
 						token: '',
 						hasSep: true, //false,
 						sep: '',
 						explicitSep: false,
 						newLine: false,
 						endBrace: false,
-									
+
 						isTemplateExpression: false,
 						isFor: false,
 						isForArguments: false,
@@ -419,7 +419,7 @@ exports.add = function add(modules) {
 							this.isForArguments = !!level.isForArguments;
 							this.isDo = !!level.isDo;
 						},
-									
+
 						isDirective: false,
 						isDirectiveBlock: false,
 						directive: '',
@@ -467,10 +467,10 @@ exports.add = function add(modules) {
 							};
 							return block;
 						},
-							
+
 						memorize: 0,
 						memorizedCode: '',
-							
+
 						writeCode: function writeCode(code) {
 							if (this.memorize > 0) {
 								this.memorizedCode += code;
@@ -930,31 +930,31 @@ exports.add = function add(modules) {
 							};
 						},
 					};
-						
+
 					const knownDirectives = this.__knownDirectives,
 						directives = state.directives;
-								
+
 					tools.forEach(knownDirectives, function(directive, name) {
 						directives[name] = types.bind(state, directive);
 					});
-								
+
 					this.__state = state;
 				}),
-							
+
 				reset: doodad.OVERRIDE(function reset() {
 					this.__clearState();
-								
+
 					this._super();
 				}),
 
 				define: doodad.PUBLIC(function define(name, value) {
 					this.__state.directives.DEFINE(name, value);
 				}),
-							
+
 				undefine: doodad.PUBLIC(function undefine(name) {
 					this.__state.directives.UNDEFINE(name);
 				}),
-					
+
 				onWrite: doodad.OVERRIDE(function onWrite(ev) {
 					const retval = this._super(ev);
 
@@ -976,7 +976,7 @@ exports.add = function add(modules) {
 						this.submit(new io.TextData(minifierState.buffer), {callback: data.defer()});
 						minifierState.buffer = '';
 					};
-						
+
 					if (eof) {
 						this.__clearState();
 						this.submit(new io.TextData(io.EOF), {callback: data.defer()});
@@ -985,8 +985,8 @@ exports.add = function add(modules) {
 					return retval;
 				}),
 			}));
-							
-							
+
+
 			//return function init(/*optional*/options) {
 			//};
 		},
