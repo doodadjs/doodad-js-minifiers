@@ -865,7 +865,8 @@ exports.add = function add(modules) {
 													if (this.endBrace && ((this.sep === ' ') || (this.minifier.__endBraceKeywords.indexOf(token) >= 0) || (this.isDo && (this.minifier.__keywordsFollowingDoKeyword.indexOf(token) >= 0)))) {
 														this.hasSep = true;
 													};
-													this.isDo = this.isFor = false;
+													this.isDo = false;
+													this.isFor = false;
 												};
 												if (this.token || this.explicitSep || this.newLine) {
 													if (this.token || this.explicitSep) {
