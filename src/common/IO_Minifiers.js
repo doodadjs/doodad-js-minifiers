@@ -148,6 +148,7 @@ exports.add = function add(modules) {
 								this.writeCode(code);
 							} else {
 								this.parseCode(code);
+								this.writeToken(false);
 							};
 						},
 						IF: function IF(val) {
@@ -485,10 +486,11 @@ exports.add = function add(modules) {
 							},
 							writeToken: function writeToken(/*optional*/noSep) {
 								if (noSep || this.hasSep) {
-									this.writeCode(this.token);
+									this.writeCode(this.prevChr + this.token);
 								} else {
-									this.writeCode(this.token + this.sep);
+									this.writeCode(this.prevChr + this.token + this.sep);
 								};
+								this.prevChr = '';
 								this.token = '';
 								this.sep = '';
 								this.explicitSep = false;
