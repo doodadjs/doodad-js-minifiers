@@ -147,7 +147,7 @@ exports.add = function add(modules) {
 								this.writeToken(false);
 								this.writeCode(code);
 							} else {
-								this.parseCode(code + " ");
+								this.parseCode(code);
 							};
 						},
 						IF: function IF(val) {
