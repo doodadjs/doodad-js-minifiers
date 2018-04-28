@@ -543,8 +543,10 @@ exports.add = function add(modules) {
 								this.index = (types.isNothing(start) ? 0 : _shared.Natives.mathMax(start, 0));
 								end = (types.isNothing(end) ? code.length : _shared.Natives.mathMin(end, code.length));
 
+								let chr = null;
+
 								analyseChunk: while (this.index < end) {
-									let chr = unicode.nextChar(code, this.index, end);
+									chr = unicode.nextChar(code, this.index, end);
 									if (this.isDirective || this.isDirectiveBlock) {
 										nextCharDirective: while (chr) {
 											if (!chr.complete) {
@@ -941,7 +943,7 @@ exports.add = function add(modules) {
 									};
 								};
 
-								if (eof) {
+								if (eof && !chr) {
 									if (this.isDirectiveBlock) {
 										throw new types.Error("A directives block is still opened at EOF.");
 									};
