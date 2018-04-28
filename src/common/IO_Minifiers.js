@@ -349,6 +349,9 @@ exports.add = function add(modules) {
 						'const',
 					], extenders.UniqueArray)),
 
+					__acceptRegExpKeywords: doodad.PROTECTED(doodad.ATTRIBUTE([
+						'return',
+					], extenders.UniqueArray)),
 
 					setOptions: doodad.OVERRIDE(function setOptions(options) {
 						types.getDefault(options, 'runDirectives', types.getIn(this.options, 'runDirectives', false));
@@ -690,21 +693,13 @@ exports.add = function add(modules) {
 											this.writeCode(code.slice(this.index));
 										};
 										break analyseChunk;
-									} else if (this.isRegExp) {
+									} else if (this.isRegExp || this.isRegExpEnd) {
 										while (chr) {
 											if (!chr.complete) {
 												// Incomplete Unicode sequence
 												break analyseChunk;
 											};
-											if (this.isEscaped) {
-												this.isEscaped = false;
-											} else if (chr.chr === '\\') {
-												this.isEscaped = true;
-											} else if (this.isCharSequence) {
-												if (chr.chr === ']') {
-													this.isCharSequence = false;
-												};
-											} else if (this.isRegExpEnd) {
+											if (this.isRegExpEnd) {
 												// Flags
 												const lowerChrAscii = unicode.codePointAt(chr.chr.toLowerCase(), 0).codePoint;
 												if ((lowerChrAscii < 97) || (lowerChrAscii > 122)) { // "a", "z"
@@ -714,9 +709,18 @@ exports.add = function add(modules) {
 													this.index = chr.index;
 													continue analyseChunk;
 												};
+											} else if (this.isEscaped) {
+												this.isEscaped = false;
+											} else if (chr.chr === '\\') {
+												this.isEscaped = true;
+											} else if (this.isCharSequence) {
+												if (chr.chr === ']') {
+													this.isCharSequence = false;
+												};
 											} else if (chr.chr === '[') {
 												this.isCharSequence = true;
 											} else if (chr.chr === '/') {
+												this.isRegExp = false;
 												this.isRegExpEnd = true;
 											};
 											chr = chr.nextChar();
@@ -760,11 +764,12 @@ exports.add = function add(modules) {
 													this.index = chr.index;
 												};
 												continue analyseChunk;
-											} else if (!this.token && !this.ignoreRegExp && (this.prevChr === '/')) {
+											} else if (/*!this.token &&*/ !this.ignoreRegExp && (this.prevChr === '/')) {
 												this.writeToken(false);
 												this.writeCode('/');
 												this.prevChr = '';
 												this.isRegExp = true;
+												this.isRegExpEnd = false;
 												this.index = chr.index;
 												continue analyseChunk;
 											} else if (((chr.codePoint === 43) || (chr.codePoint === 45)) && ((this.prevChr + chr.chr) === (chr.chr + chr.chr))) { // "++", "--"
@@ -802,9 +807,6 @@ exports.add = function add(modules) {
 												this.index = chr.index + chr.size;
 												continue analyseChunk;
 											} else if ((chr.codePoint === 59) || unicode.isSpace(chr.chr, curLocale)) { // ";", "{space}"
-												if (this.token) {
-													this.ignoreRegExp = true;
-												};
 												if (this.options.keepSpaces) {
 													this.writeToken(false);
 												};
@@ -891,7 +893,7 @@ exports.add = function add(modules) {
 													this.writeToken(false); // write current token and separator
 												};
 												this.token = token;
-												this.ignoreRegExp = false;
+												this.ignoreRegExp = (token && (this.minifier.__acceptRegExpKeywords.indexOf(token) < 0));
 												continue nextChar;
 											} else if ((chr.codePoint === 123) || (chr.codePoint === 40) || (chr.codePoint === 91)) { // "{", "(", "["
 												if (chr.codePoint === 40) { // "("
