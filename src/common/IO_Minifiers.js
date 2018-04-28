@@ -764,7 +764,7 @@ exports.add = function add(modules) {
 													this.index = chr.index;
 												};
 												continue analyseChunk;
-											} else if (/*!this.token &&*/ !this.ignoreRegExp && (this.prevChr === '/')) {
+											} else if (!this.ignoreRegExp && (this.prevChr === '/')) {
 												this.writeToken(false);
 												this.writeCode('/');
 												this.prevChr = '';
@@ -811,34 +811,50 @@ exports.add = function add(modules) {
 													this.writeToken(false);
 												};
 												let lastIndex = null;
+												let hasSemi = false;
+												let hasNewLine = false;
+												let hasSpace = false;
 												this.index = chr.index;
 												doSpaces: do {
-													if (chr.codePoint === 59) { // ";"
-														this.sep = ';';
-														this.explicitSep = true;
-														if (!this.options.keepSpaces && this.isForArguments) {
-															this.hasSep = false;
-															this.writeToken(false);
-														};
-													} else if ((chr.codePoint === 10) || (chr.codePoint === 13)) { // CR/LF
-														this.newLine = true;
-														if (this.token) {
-															this.hasSep = false;
-														};
-													} else if (!this.sep) { // Other {space}
-														this.sep = ' ';
-													};
 													lastIndex = chr.index + chr.size;
+													if (chr.codePoint === 59) { // ";"
+														hasSemi = true;
+													} else if ((chr.codePoint === 10) || (chr.codePoint === 13)) { // CR/LF
+														hasNewLine = true;
+													} else { // Other {space}
+														hasSpace = true;
+													};
 													chr = chr.nextChar();
 													if (chr) {
 														if (!chr.complete) {
-														// Incomplete Unicode sequence
+															// Incomplete Unicode sequence
 															break analyseChunk;
 														};
 													} else {
-														break doSpaces;
+														if (eof) {
+															break doSpaces;
+														};
+														this.prevChr = code.slice(this.index, lastIndex);
+														break analyseChunk;
 													};
 												} while ((chr.codePoint === 59) || unicode.isSpace(chr.chr, curLocale)); // ";", "{space}"
+												if (hasSemi) { // ";"
+													this.sep = ';';
+													this.explicitSep = true;
+													if (!this.options.keepSpaces && this.isForArguments) {
+														this.hasSep = false;
+														this.writeToken(false);
+													};
+												};
+												if (hasNewLine) { // CR/LF
+													this.newLine = true;
+													if (this.token) {
+														this.hasSep = false;
+													};
+												};
+												if (hasSpace && !this.sep) { // Other {space}
+													this.sep = ' ';
+												};
 												if (this.options.keepSpaces) {
 													this.explicitSep = false;
 													this.sep = '';
