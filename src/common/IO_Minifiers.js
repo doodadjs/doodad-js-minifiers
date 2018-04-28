@@ -80,14 +80,14 @@ exports.add = function add(modules) {
 							delete this.variables[key];
 						},
 						BEGIN_DEFINE: function BEGIN_DEFINE(removeBlock) {
-						/*
-							ex:
-								//! BEGIN_DEFINE()
-									const a = 1;
-									const b = '2';
-									...
-								//! END_DEFINE()
-						*/
+							/*
+								ex:
+									//! BEGIN_DEFINE()
+										const a = 1;
+										const b = '2';
+										...
+									//! END_DEFINE()
+							*/
 							this.writeToken(false);
 							this.pushDirective({
 								name: 'DEFINE',
@@ -147,8 +147,7 @@ exports.add = function add(modules) {
 								this.writeToken(false);
 								this.writeCode(code);
 							} else {
-								this.parseCode(code);
-								this.writeToken(false);
+								this.parseCode(code, null, null, true);
 							};
 						},
 						IF: function IF(val) {
@@ -486,9 +485,9 @@ exports.add = function add(modules) {
 							},
 							writeToken: function writeToken(/*optional*/noSep) {
 								if (noSep || this.hasSep) {
-									this.writeCode(this.prevChr + this.token);
+									this.writeCode(this.token);
 								} else {
-									this.writeCode(this.prevChr + this.token + this.sep);
+									this.writeCode(this.token + this.sep);
 								};
 								this.prevChr = '';
 								this.token = '';
@@ -528,14 +527,14 @@ exports.add = function add(modules) {
 												} catch(ex) {
 													throw new types.ParseError("The directive '~0~' has failed to execute : ~1~", [directive, ex.stack]);
 												};
-											//evaled = true;
+												//evaled = true;
 											};
 										};
 									};
 								};
 							},
 
-							parseCode: function(code, /*optional*/start, /*optional*/end) {
+							parseCode: function(code, /*optional*/start, /*optional*/end, /*optional*/eof) {
 								const curLocale = locale.getCurrent();
 
 								code = (this.prevChr || '') + (code || '');
@@ -549,7 +548,7 @@ exports.add = function add(modules) {
 									if (this.isDirective || this.isDirectiveBlock) {
 										nextCharDirective: while (chr) {
 											if (!chr.complete) {
-											// Incomplete Unicode sequence
+												// Incomplete Unicode sequence
 												break analyseChunk;
 											};
 											if (this.isDirectiveBlock && ((this.prevChr + chr.chr) === '*/')) {
@@ -557,7 +556,9 @@ exports.add = function add(modules) {
 												this.isDirectiveBlock = false;
 												const directive = this.directive;
 												this.directive = '';
-												this.runDirective(directive);
+												if (directive) {
+													this.runDirective(directive);
+												};
 												this.index = chr.index + chr.size;
 												continue analyseChunk;
 											} else if (this.prevChr) { // '*'
@@ -565,7 +566,7 @@ exports.add = function add(modules) {
 												this.prevChr = '';
 												continue nextCharDirective;
 											} else if (this.isDirectiveBlock && (chr.chr === '*')) {
-											// Wait next char
+												// Wait next char
 												this.prevChr = chr.chr;
 											} else if ((chr.chr === '\n') || (chr.chr === '\r')) {
 												this.prevChr = '';
@@ -574,7 +575,9 @@ exports.add = function add(modules) {
 												this.isDirectiveBlock = false;
 												const directive = this.directive;
 												this.directive = '';
-												this.runDirective(directive);
+												if (directive) {
+													this.runDirective(directive);
+												};
 												if (isDirectiveBlock) {
 													this.isDirectiveBlock = true;
 												} else {
@@ -586,11 +589,23 @@ exports.add = function add(modules) {
 											};
 											chr = chr.nextChar();
 										};
+										if (eof && !chr) {
+											if (this.isDirectiveBlock) {
+												throw new types.Error("A directives block is still opened at EOF.");
+											};
+											this.prevChr = '';
+											this.isDirective = false;
+											const directive = this.directive;
+											this.directive = '';
+											if (directive) {
+												this.runDirective(directive);
+											};
+										};
 										break analyseChunk;
 									} else if (this.isComment) {
 										while (chr) {
 											if (!chr.complete) {
-											// Incomplete Unicode sequence
+												// Incomplete Unicode sequence
 												break analyseChunk;
 											};
 											if ((chr.chr === '\n') || (chr.chr === '\r')) {
@@ -614,7 +629,7 @@ exports.add = function add(modules) {
 									} else if (this.isCommentBlock) {
 										nextCharCommentBlock: while (chr) {
 											if (!chr.complete) {
-											// Incomplete Unicode sequence
+												// Incomplete Unicode sequence
 												break analyseChunk;
 											};
 											if ((this.prevChr + chr.chr) === '*/') {
@@ -630,36 +645,42 @@ exports.add = function add(modules) {
 												this.prevChr = '';
 												continue nextCharCommentBlock;
 											} else if (chr.chr === '*') {
-											// Wait next char
+												// Wait next char
 												this.prevChr = chr.chr;
 											};
 											chr = chr.nextChar();
 										};
-										if (!chr && this.options.keepComments) {
-											this.writeToken(false);
-											this.writeCode(code.slice(this.index));
+										if (!chr) {
+											if (eof) {
+												throw new types.Error("A comments block is still opened at EOF.");
+											};
+
+											if (this.options.keepComments) {
+												this.writeToken(false);
+												this.writeCode(code.slice(this.index));
+											};
 										};
 										break analyseChunk;
 									} else if (this.isString || this.isTemplate) {
 										while (chr) {
 											if (!chr.complete) {
-											// Incomplete Unicode sequence
+												// Incomplete Unicode sequence
 												break analyseChunk;
 											};
 											if (this.isString && ((chr.chr === '\n') || (chr.chr === '\r'))) {
-											// NOTE: "new line" can be "\r\n" or "\n\r", so there is no condition on "this.isEscaped"
-											// Multi-Line String. New line is removed. It assumes new line is escaped because otherwise it is a synthax error.
-											// Exemple :
-											//     const a = "Hello \
-											//     world !"
+												// NOTE: "new line" can be "\r\n" or "\n\r", so there is no condition on "this.isEscaped"
+												// Multi-Line String. New line is removed. It assumes new line is escaped because otherwise it is a synthax error.
+												// Exemple :
+												//     const a = "Hello \
+												//     world !"
 												this.writeCode(code.slice(this.index, chr.index));
 												this.index = chr.index + chr.size;
 												continue analyseChunk;
 											} else if (this.isEscaped) {
-											// Skip escaped character.
+												// Skip escaped character.
 												this.isEscaped = false;
 											} else if (chr.chr === '\\') {
-											// Character escape. Will skip the following character in case it is "'", '"' or "`". Other escapes ("\n", "\u...", ...) are not harmfull.
+												// Character escape. Will skip the following character in case it is "'", '"' or "`". Other escapes ("\n", "\u...", ...) are not harmfull.
 												this.isEscaped = true;
 											} else if (this.isTemplate && ((this.prevChr + chr.chr) === '${')) {
 												this.prevChr = '';
@@ -682,13 +703,16 @@ exports.add = function add(modules) {
 											chr = chr.nextChar();
 										};
 										if (!chr) {
+											if (eof) {
+												throw new types.Error("A string expression is still opened at EOF.");
+											};
 											this.writeCode(code.slice(this.index));
 										};
 										break analyseChunk;
 									} else if (this.isRegExp) {
 										while (chr) {
 											if (!chr.complete) {
-											// Incomplete Unicode sequence
+												// Incomplete Unicode sequence
 												break analyseChunk;
 											};
 											if (this.isEscaped) {
@@ -700,7 +724,7 @@ exports.add = function add(modules) {
 													this.isCharSequence = false;
 												};
 											} else if (this.isRegExpEnd) {
-											// Flags
+												// Flags
 												const lowerChrAscii = unicode.codePointAt(chr.chr.toLowerCase(), 0).codePoint;
 												if ((lowerChrAscii < 97) || (lowerChrAscii > 122)) { // "a", "z"
 													this.isRegExpEnd = false;
@@ -717,17 +741,20 @@ exports.add = function add(modules) {
 											chr = chr.nextChar();
 										};
 										if (!chr) {
+											if (eof) {
+												throw new types.Error("A regular expression is still opened at EOF.");
+											};
 											this.writeCode(code.slice(this.index));
 										};
 										break analyseChunk;
 									} else {
 										nextChar: while (chr) {
 											if (!chr.complete) {
-											// Incomplete Unicode sequence
+												// Incomplete Unicode sequence
 												break analyseChunk;
 											};
 											if (((this.prevChr + chr.chr) === '//') || ((this.prevChr + chr.chr) === '/*')) {
-											// Wait for the next char
+												// Wait for the next char
 												this.prevChr += chr.chr;
 												chr = chr.nextChar();
 												continue nextChar;
@@ -768,14 +795,15 @@ exports.add = function add(modules) {
 												this.writeCode(chr.chr + chr.chr);
 												this.ignoreRegExp = false;
 											} else if ((this.prevChr === '/') || (this.prevChr === '+') || (this.prevChr === '-')) { // "/", "+", "-"
-												this.writeToken(!this.explicitSep);
-												this.writeCode(this.prevChr);
-												this.hasSep = true;
+												const prevChr = this.prevChr;
 												this.prevChr = '';
+												this.writeToken(!this.explicitSep);
+												this.writeCode(prevChr);
+												this.hasSep = true;
 												this.ignoreRegExp = false;
 												continue nextChar;
 											} else if ((chr.codePoint === 47) || (chr.codePoint === 43) || (chr.codePoint === 45)) { // "/", "+", "-"
-											// Wait for the next char
+												// Wait for the next char
 												this.index = chr.index; // for "this.options.keepComments"
 												this.prevChr = chr.chr;
 												chr = chr.nextChar();
@@ -846,15 +874,18 @@ exports.add = function add(modules) {
 												continue nextChar;
 											} else if ((chr.codePoint === 36) || (chr.codePoint === 95) || unicode.isAlnum(chr.chr, curLocale)) { // "$", "_", "{alnum}"
 												let token = '';
-												do {
+												doGetToken: do {
 													token += chr.chr; // build new token
 													chr = chr.nextChar();
 													if (chr) {
 														if (!chr.complete) {
-														// Incomplete Unicode sequence
+															// Incomplete Unicode sequence
 															break analyseChunk;
 														};
 													} else {
+														if (eof) {
+															break doGetToken;
+														};
 														this.prevChr = token;
 														break analyseChunk;
 													};
@@ -931,6 +962,15 @@ exports.add = function add(modules) {
 										break analyseChunk;
 									};
 								};
+
+								if (eof) {
+									const prevChr = this.prevChr;
+									this.prevChr = '';
+									this.writeToken(false);
+									if (prevChr) {
+										this.writeCode(prevChr);
+									};
+								};
 							},
 						};
 
@@ -968,12 +1008,7 @@ exports.add = function add(modules) {
 
 						const eof = (data.raw === io.EOF);
 
-						minifierState.parseCode(data.toString()); // sync
-
-						if (eof) {
-							minifierState.parseCode(this.options.newLine); // sync
-							minifierState.writeToken(false);
-						};
+						minifierState.parseCode(data.toString(), null, null, eof); // sync
 
 						if (minifierState.buffer) {
 							this.submit(new io.TextData(minifierState.buffer), {callback: data.defer()});
