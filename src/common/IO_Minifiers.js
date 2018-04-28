@@ -589,18 +589,6 @@ exports.add = function add(modules) {
 											};
 											chr = chr.nextChar();
 										};
-										if (eof && !chr) {
-											if (this.isDirectiveBlock) {
-												throw new types.Error("A directives block is still opened at EOF.");
-											};
-											this.prevChr = '';
-											this.isDirective = false;
-											const directive = this.directive;
-											this.directive = '';
-											if (directive) {
-												this.runDirective(directive);
-											};
-										};
 										break analyseChunk;
 									} else if (this.isComment) {
 										while (chr) {
@@ -651,10 +639,6 @@ exports.add = function add(modules) {
 											chr = chr.nextChar();
 										};
 										if (!chr) {
-											if (eof) {
-												throw new types.Error("A comments block is still opened at EOF.");
-											};
-
 											if (this.options.keepComments) {
 												this.writeToken(false);
 												this.writeCode(code.slice(this.index));
@@ -703,9 +687,6 @@ exports.add = function add(modules) {
 											chr = chr.nextChar();
 										};
 										if (!chr) {
-											if (eof) {
-												throw new types.Error("A string expression is still opened at EOF.");
-											};
 											this.writeCode(code.slice(this.index));
 										};
 										break analyseChunk;
@@ -741,9 +722,6 @@ exports.add = function add(modules) {
 											chr = chr.nextChar();
 										};
 										if (!chr) {
-											if (eof) {
-												throw new types.Error("A regular expression is still opened at EOF.");
-											};
 											this.writeCode(code.slice(this.index));
 										};
 										break analyseChunk;
@@ -964,6 +942,40 @@ exports.add = function add(modules) {
 								};
 
 								if (eof) {
+									if (this.isDirectiveBlock) {
+										throw new types.Error("A directives block is still opened at EOF.");
+									};
+
+									if (this.isDirective) {
+										this.prevChr = '';
+										this.isDirective = false;
+										const directive = this.directive;
+										this.directive = '';
+										if (directive) {
+											this.runDirective(directive);
+										};
+									};
+
+									if (this.isCommentBlock) {
+										throw new types.Error("A comments block is still opened at EOF.");
+									};
+
+									if (this.isString) {
+										throw new types.Error("A string  is still opened at EOF.");
+									};
+
+									if (this.isTemplateExpression) {
+										throw new types.Error("A template expression is still opened at EOF.");
+									};
+
+									if (this.isTemplate) {
+										throw new types.Error("A template is still opened at EOF.");
+									};
+
+									if (this.isRegExp) {
+										throw new types.Error("A regular expression is still opened at EOF.");
+									};
+
 									const prevChr = this.prevChr;
 									this.prevChr = '';
 									this.writeToken(false);
