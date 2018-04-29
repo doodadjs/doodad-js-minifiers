@@ -845,14 +845,12 @@ exports.add = function add(modules) {
 														this.hasSep = false;
 														this.writeToken(false);
 													};
-												};
-												if (hasNewLine) { // CR/LF
+												} else if (hasNewLine) { // CR/LF
 													this.newLine = true;
 													if (this.token) {
 														this.hasSep = false;
 													};
-												};
-												if (hasSpace && !this.sep) { // Other {space}
+												} else if (hasSpace && !this.sep) { // Other {space}
 													this.sep = ' ';
 												};
 												if (this.options.keepSpaces) {
