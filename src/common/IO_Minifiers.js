@@ -200,6 +200,46 @@ exports.add = function add(modules) {
 								remove: !block.remove || !expr,
 							});
 						},
+						ELSE_IF_DEF: function ELSE_IF_DEF(key) {
+							const block = this.popDirective();
+							if (!block || (block.name !== 'IF')) {
+								throw new types.Error("Invalid 'ELSE_IF' directive.");
+							};
+							this.pushDirective({
+								name: 'IF',
+								remove: !block.remove || !types.has(this.variables, key),
+							});
+						},
+						ELSE_IF_UNDEF: function ELSE_IF_UNDEF(key) {
+							const block = this.popDirective();
+							if (!block || (block.name !== 'IF')) {
+								throw new types.Error("Invalid 'ELSE_IF' directive.");
+							};
+							this.pushDirective({
+								name: 'IF',
+								remove: !block.remove || types.has(this.variables, key),
+							});
+						},
+						ELSE_IF_SET: function ELSE_IF_SET(key) {
+							const block = this.popDirective();
+							if (!block || (block.name !== 'IF')) {
+								throw new types.Error("Invalid 'ELSE_IF' directive.");
+							};
+							this.pushDirective({
+								name: 'IF',
+								remove: !block.remove || !types.get(this.variables, key, false),
+							});
+						},
+						ELSE_IF_UNSET: function ELSE_IF_UNSET(key) {
+							const block = this.popDirective();
+							if (!block || (block.name !== 'IF')) {
+								throw new types.Error("Invalid 'ELSE_IF' directive.");
+							};
+							this.pushDirective({
+								name: 'IF',
+								remove: !block.remove || !!types.get(this.variables, key, false),
+							});
+						},
 						END_IF: function END_IF() {
 							const block = this.popDirective();
 							if (!block || (block.name !== 'IF')) {
