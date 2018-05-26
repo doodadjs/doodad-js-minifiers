@@ -832,6 +832,7 @@ exports.add = function add(modules) {
 												chr = chr.nextChar();
 												continue nextChar;
 											} else if ((chr.codePoint === 34) || (chr.codePoint === 39)) { // '"', "'"
+												this.hasSep = false;
 												this.writeToken(false);
 												this.isString = true;
 												this.stringChr = chr.chr;
@@ -950,12 +951,12 @@ exports.add = function add(modules) {
 												this.ignoreRegExp = (token && (this.minifier.__acceptRegExpKeywords.indexOf(token) < 0));
 												continue nextChar;
 											} else if ((chr.codePoint === 123) || (chr.codePoint === 40) || (chr.codePoint === 91)) { // "{", "(", "["
-												if (chr.codePoint === 40) { // "("
+												if ((chr.codePoint === 123) || (chr.codePoint === 40)) { // "{", "("
 													if (this.explicitSep || this.newLine) {
 														this.hasSep = false;
 													};
 												};
-												this.writeToken(!this.explicitSep);
+												this.writeToken(false);
 												this.writeCode(chr.chr);
 												if (chr.codePoint === 40) { // "("
 													this.pushLevel('(');
@@ -983,8 +984,16 @@ exports.add = function add(modules) {
 													this.endBrace = true;
 												};
 												this.ignoreRegExp = true;
+											} else if ((chr.codePoint === 33) || (chr.codePoint === 126)) { // "!", "~"
+												// OP+TOKEN
+												if (this.explicitSep || this.newLine) {
+													this.hasSep = false;
+												};
+												this.writeToken(false);
+												this.writeCode(chr.chr);
+												this.hasSep = true;
+												this.ignoreRegExp = false;
 											} else { // TOKEN+OP+TOKEN : "=", "==", "===", "!=", "!==", "%", "*", "&", "^", "^=", "&=", "|", "|=", "&&", "||", "^", '<', '>', '<=', '>=', '<<', '>>', '<<=', '>>=', '>>>=', '<<<', '>>>', '.', ',', '+=', '-=', '*=', '/=', '%=', '**', '**=', "?", ":"
-												// OP+TOKEN       : "!", "~"
 												// ",", "."
 												this.writeToken(!this.explicitSep);
 												this.writeCode(chr.chr);
