@@ -35,7 +35,6 @@ exports.add = function add(modules) {
 		version: /*! REPLACE_BY(TO_SOURCE(VERSION(MANIFEST("name")))) */ null /*! END_REPLACE()*/,
 		create: function create(root, /*optional*/_options, _shared) {
 			const doodad = root.Doodad,
-				//mixIns = doodad.MixIns,
 				types = doodad.Types,
 				tools = doodad.Tools,
 				safeEval = tools.SafeEval,
@@ -43,11 +42,7 @@ exports.add = function add(modules) {
 				unicode = tools.Unicode,
 				io = doodad.IO,
 				ioMixIns = io.MixIns,
-				//ioInterfaces = io.Interfaces,
 				extenders = doodad.Extenders,
-				//nodejs = doodad.NodeJs,
-				//nodejsIO = nodejs && nodejs.IO,
-				//nodejsIOInterfaces = nodejsIO && nodejsIO.Interfaces,
 				minifiers = io.Minifiers;
 
 
@@ -545,33 +540,21 @@ exports.add = function add(modules) {
 									directive = tools.trim(directive.replace(/^\s*/, ''));
 									if (directive) {
 										const name = tools.split(directive, '(', 2)[0].trim();
-										let evaled = false;
-										if (tools.indexOf(this.minifier.__beginMemorizeDirectives, name) >= 0) {
-											if (this.memorize === 0) {
-												try {
-													safeEval.eval(directive, this.directives, null, {allowRegExp: true});
-												} catch(ex) {
-													throw new types.ParseError("The directive '~0~' has failed to execute : ~1~", [directive, ex.stack]);
-												};
-												evaled = true;
-											};
-											this.memorize++;
-										} else if (tools.indexOf(this.minifier.__endMemorizeDirectives, name) >= 0) {
+										if (tools.indexOf(this.minifier.__endMemorizeDirectives, name) >= 0) {
 											this.writeToken(false);
 											this.memorize--;
 										};
-										if (!evaled) {
-											if (this.memorize > 0) {
-												this.writeToken(false);
-												this.memorizedCode += '/*!' + directive + '*/';
-											} else {
-												try {
-													safeEval.eval(directive, this.directives, null, {allowRegExp: true});
-												} catch(ex) {
-													throw new types.ParseError("The directive '~0~' has failed to execute : ~1~", [directive, ex.stack]);
-												};
-												//evaled = true;
+										if (this.memorize === 0) {
+											try {
+												safeEval.eval(directive, this.directives, null, {allowRegExp: true});
+											} catch(ex) {
+												throw new types.ParseError("The directive '~0~' has failed to execute : ~1~", [directive, ex.stack]);
 											};
+										} else {
+											this.memorizedCode += '/*!' + directive + '*/';
+										};
+										if (tools.indexOf(this.minifier.__beginMemorizeDirectives, name) >= 0) {
+											this.memorize++;
 										};
 									};
 								};
@@ -832,7 +815,9 @@ exports.add = function add(modules) {
 												chr = chr.nextChar();
 												continue nextChar;
 											} else if ((chr.codePoint === 34) || (chr.codePoint === 39)) { // '"', "'"
-												this.hasSep = false;
+												if (this.explicitSep || this.newLine) {
+													this.hasSep = false;
+												};
 												this.writeToken(false);
 												this.isString = true;
 												this.stringChr = chr.chr;
@@ -841,14 +826,18 @@ exports.add = function add(modules) {
 												this.ignoreRegExp = false;
 												continue analyseChunk;
 											} else if (chr.codePoint === 96) { // "`"
+												if (this.explicitSep || this.newLine) {
+													this.hasSep = false;
+												};
 												this.writeToken(false);
 												this.isTemplate = true;
 												this.stringChr = chr.chr;
 												this.writeCode(chr.chr);
 												this.index = chr.index + chr.size;
+												this.ignoreRegExp = false;
 												continue analyseChunk;
 											} else if ((chr.codePoint === 59) || unicode.isSpace(chr.chr, curLocale)) { // ";", "{space}"
-												if (this.options.keepSpaces) {
+												if (this.options.keepSpaces || (this.memorize > 0)) {
 													this.writeToken(false);
 												};
 												let lastIndex = null;
@@ -879,7 +868,15 @@ exports.add = function add(modules) {
 														break analyseChunk;
 													};
 												} while ((chr.codePoint === 59) || unicode.isSpace(chr.chr, curLocale)); // ";", "{space}"
-												if (hasSemi) { // ";"
+												if (this.options.keepSpaces || (this.memorize > 0)) {
+													this.explicitSep = false;
+													this.sep = '';
+													this.hasSep = true;
+													this.newLine = false;
+													this.writeCode(code.slice(this.index, lastIndex));
+													this.index = lastIndex;
+													continue analyseChunk;
+												} if (hasSemi) { // ";"
 													this.sep = ';';
 													this.explicitSep = true;
 													if (!this.options.keepSpaces && this.isForArguments) {
@@ -893,18 +890,6 @@ exports.add = function add(modules) {
 													};
 												} else if (hasSpace && !this.sep) { // Other {space}
 													this.sep = ' ';
-												};
-												if (this.options.keepSpaces) {
-													this.explicitSep = false;
-													this.sep = '';
-													this.hasSep = true;
-													this.newLine = false;
-													this.writeCode(code.slice(this.index, lastIndex));
-													this.index = lastIndex;
-													continue analyseChunk;
-												} else if (this.memorize > 0) {
-													this.hasSep = false;
-													this.writeToken(false);
 												};
 												continue nextChar;
 											} else if ((chr.codePoint === 36) || (chr.codePoint === 95) || unicode.isAlnum(chr.chr, curLocale)) { // "$", "_", "{alnum}"
@@ -951,10 +936,10 @@ exports.add = function add(modules) {
 												this.ignoreRegExp = (token && (this.minifier.__acceptRegExpKeywords.indexOf(token) < 0));
 												continue nextChar;
 											} else if ((chr.codePoint === 123) || (chr.codePoint === 40) || (chr.codePoint === 91)) { // "{", "(", "["
-												if ((chr.codePoint === 123) || (chr.codePoint === 40)) { // "{", "("
-													if (this.explicitSep || this.newLine) {
-														this.hasSep = false;
-													};
+												if (this.sep !== ';') {
+													this.hasSep = true;
+												} else if (this.explicitSep || this.newLine) {
+													this.hasSep = false;
 												};
 												this.writeToken(false);
 												this.writeCode(chr.chr);
@@ -1043,6 +1028,9 @@ exports.add = function add(modules) {
 
 									const prevChr = this.prevChr;
 									this.prevChr = '';
+									if (this.explicitSep || this.newLine) {
+										this.hasSep = false;
+									};
 									this.writeToken(false);
 									if (prevChr) {
 										this.writeCode(prevChr);
