@@ -386,6 +386,7 @@ exports.add = function add(modules) {
 
 					__acceptRegExpKeywords: doodad.PROTECTED(doodad.ATTRIBUTE([
 						'return',
+						'yield',
 					], extenders.UniqueArray)),
 
 					setOptions: doodad.OVERRIDE(function setOptions(options) {
