@@ -97,7 +97,7 @@ exports.add = function add(modules) {
 							const memorizedCode = this.memorizedCode;
 							this.memorizedCode = '';
 							if (memorizedCode) {
-								const lines = memorizedCode.split(/\n|\r/g);
+								const lines = memorizedCode.split(this.minifier.__newLineRegExp);
 								const mem = {tmp: {}};
 								for (let i = 0; i < lines.length; i++) {
 									let line = lines[i];
@@ -389,6 +389,15 @@ exports.add = function add(modules) {
 						'yield',
 					], extenders.UniqueArray)),
 
+					__newLineChars: doodad.PROTECTED(doodad.ATTRIBUTE([
+						'\n',
+						'\r',
+						'\u2028',
+						'\u2029',
+					], extenders.UniqueArray)),
+
+					__newLineRegExp: doodad.PROTECTED(/\n|\r|\u2028|\u2029/g),
+
 					setOptions: doodad.OVERRIDE(function setOptions(options) {
 						types.getDefault(options, 'runDirectives', types.getIn(this.options, 'runDirectives', false));
 						types.getDefault(options, 'keepComments', types.getIn(this.options, 'keepComments', false));
@@ -595,7 +604,7 @@ exports.add = function add(modules) {
 											} else if (this.isDirectiveBlock && (chr.chr === '*')) {
 												// Wait next char
 												this.prevChr = chr.chr;
-											} else if ((chr.chr === '\n') || (chr.chr === '\r')) {
+											} else if (tools.indexOf(this.minifier.__newLineChars, chr.chr) >= 0) {
 												this.prevChr = '';
 												this.isDirective = false;
 												const isDirectiveBlock = this.isDirectiveBlock;
@@ -623,7 +632,7 @@ exports.add = function add(modules) {
 												// Incomplete Unicode sequence
 												break analyseChunk;
 											};
-											if ((chr.chr === '\n') || (chr.chr === '\r')) {
+											if (tools.indexOf(this.minifier.__newLineChars, chr.chr) >= 0) {
 												this.isComment = false;
 												if (this.options.keepComments) {
 													this.writeToken(false);
@@ -678,7 +687,7 @@ exports.add = function add(modules) {
 												// Incomplete Unicode sequence
 												break analyseChunk;
 											};
-											if (this.isString && ((chr.chr === '\n') || (chr.chr === '\r'))) {
+											if (this.isString && (tools.indexOf(this.minifier.__newLineChars, chr.chr) >= 0)) {
 												// NOTE: "new line" can be "\r\n" or "\n\r", so there is no condition on "this.isEscaped"
 												// Multi-Line String. New line is removed. It assumes new line is escaped because otherwise it is a synthax error.
 												// Exemple :
