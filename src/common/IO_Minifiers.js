@@ -859,7 +859,7 @@ exports.add = function add(modules) {
 													lastIndex = chr.index + chr.size;
 													if (chr.codePoint === 59) { // ";"
 														hasSemi = true;
-													} else if ((chr.codePoint === 10) || (chr.codePoint === 13)) { // CR/LF
+													} else if (tools.indexOf(this.minifier.__newLineChars, chr.chr) >= 0) { // New line
 														hasNewLine = true;
 													} else { // Other {space}
 														hasSpace = true;
