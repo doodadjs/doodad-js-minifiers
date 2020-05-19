@@ -69,10 +69,22 @@ exports.add = function add(modules) {
 
 					__knownDirectives: doodad.PROTECTED(doodad.ATTRIBUTE({
 						DEFINE: function DEFINE(key, /*optional*/value) {
+							if (tools.indexOf(this.readOnlyVariables, key) >= 0) {
+								throw new types.Error("Variable '~0~' is reserved and it cannot be defined.", [key])
+							};
 							this.variables[key] = value;
 						},
 						UNDEFINE: function UNDEFINE(key) {
+							if (tools.indexOf(this.readOnlyVariables, key) >= 0) {
+								throw new types.Error("Variable '~0~' is reserved and it cannot be undefined.", [key])
+							};
 							delete this.variables[key];
+						},
+						SET: function SET(key) {
+							this.directives.DEFINE(key, true);
+						},
+						UNSET: function UNSET(key) {
+							this.directives.DEFINE(key, false);
 						},
 						BEGIN_DEFINE: function BEGIN_DEFINE(removeBlock) {
 							/*
@@ -109,6 +121,11 @@ exports.add = function add(modules) {
 								if (!block.remove) {
 									this.directives.INJECT(memorizedCode);
 								};
+								tools.forEach(mem.tmp, function(key) {
+									if (tools.indexOf(this.readOnlyVariables, key) >= 0) {
+										throw new types.Error("Variable '~0~' is reserved and it cannot be defined.", [key])
+									};
+								}, this);
 								tools.extend(this.variables, mem.tmp);
 							};
 						},
@@ -142,7 +159,12 @@ exports.add = function add(modules) {
 								this.writeToken(false);
 								this.writeCode(code);
 							} else {
+								//this.variables.injectedCode = true;
+								//try {
 								this.parseCode(code, null, null, true);
+								//} finally {
+								//	this.variables.injectedCode = false;
+								//};
 							};
 						},
 						IF: function IF(val) {
@@ -414,6 +436,8 @@ exports.add = function add(modules) {
 							options: this.options,
 							variables: {},
 							directives: {},
+							//readOnlyVariables: ['injectedCode'],
+							readOnlyVariables: [],
 
 							isComment: false,
 							isCommentBlock: false,
@@ -1065,12 +1089,18 @@ exports.add = function add(modules) {
 						this._super();
 					}),
 
-					define: doodad.PUBLIC(function define(name, value) {
-						this.__state.directives.DEFINE(name, value);
+					define: doodad.PUBLIC(function define(name, value, /*optional*/readOnly) {
+						if (readOnly === undefined) {
+							readOnly = true;
+						};
+						if (readOnly && (tools.indexOf(this.__state.readOnlyVariables, name) < 0)) {
+							this.__state.readOnlyVariables.push(name);
+						};
+						this.__state.variables[name] = value;
 					}),
 
 					undefine: doodad.PUBLIC(function undefine(name) {
-						this.__state.directives.UNDEFINE(name);
+						delete this.__state.variables[name];
 					}),
 
 					onWrite: doodad.OVERRIDE(function onWrite(ev) {
