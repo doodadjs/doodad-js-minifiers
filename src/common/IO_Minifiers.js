@@ -70,13 +70,13 @@ exports.add = function add(modules) {
 					__knownDirectives: doodad.PROTECTED(doodad.ATTRIBUTE({
 						DEFINE: function DEFINE(key, /*optional*/value) {
 							if (tools.indexOf(this.readOnlyVariables, key) >= 0) {
-								throw new types.Error("Variable '~0~' is reserved and it cannot be defined.", [key])
+								throw new types.Error("Variable '~0~' is reserved and it cannot be defined.", [key]);
 							};
 							this.variables[key] = value;
 						},
 						UNDEFINE: function UNDEFINE(key) {
 							if (tools.indexOf(this.readOnlyVariables, key) >= 0) {
-								throw new types.Error("Variable '~0~' is reserved and it cannot be undefined.", [key])
+								throw new types.Error("Variable '~0~' is reserved and it cannot be undefined.", [key]);
 							};
 							delete this.variables[key];
 						},
@@ -123,7 +123,7 @@ exports.add = function add(modules) {
 								};
 								tools.forEach(mem.tmp, function(key) {
 									if (tools.indexOf(this.readOnlyVariables, key) >= 0) {
-										throw new types.Error("Variable '~0~' is reserved and it cannot be defined.", [key])
+										throw new types.Error("Variable '~0~' is reserved and it cannot be defined.", [key]);
 									};
 								}, this);
 								tools.extend(this.variables, mem.tmp);
