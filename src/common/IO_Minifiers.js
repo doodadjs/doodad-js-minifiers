@@ -151,7 +151,7 @@ exports.add = function add(modules) {
 							return safeEval.eval(expr, tools.extend({global: global, root: root}, this.variables), {allowFunctions: true, allowRegExp: true});
 						},
 						TO_SOURCE: function TO_SOURCE(val, /*optional*/depth) {
-							return tools.toSource(val, depth);
+							return tools.toSource(val, {depth});
 						},
 						INJECT: function INJECT(code, /*optional*/raw) {
 							code = types.toString(code);
