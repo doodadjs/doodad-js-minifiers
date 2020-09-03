@@ -883,6 +883,10 @@ exports.add = function add(modules) {
 													lastIndex = chr.index + chr.size;
 													if (chr.codePoint === 59) { // ";"
 														hasSemi = true;
+														if (this.isForArguments && !this.options.keepSpaces && (this.memorize <= 0)) {
+															chr = chr.nextChar();
+															break doSpaces;
+														};
 													} else if (tools.indexOf(this.minifier.__newLineChars, chr.chr) >= 0) { // New line
 														hasNewLine = true;
 													} else { // Other {space}
@@ -910,10 +914,10 @@ exports.add = function add(modules) {
 													this.writeCode(code.slice(this.index, lastIndex));
 													this.index = lastIndex;
 													continue analyseChunk;
-												} if (hasSemi) { // ";"
+												} else if (hasSemi) { // ";"
 													this.sep = ';';
 													this.explicitSep = true;
-													if (!this.options.keepSpaces && this.isForArguments) {
+													if (this.isForArguments) {
 														this.hasSep = false;
 														this.writeToken(false);
 													};
