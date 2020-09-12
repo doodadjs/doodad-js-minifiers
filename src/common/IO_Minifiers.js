@@ -108,8 +108,9 @@ exports.add = function add(modules) {
 							};
 							const memorizedCode = this.memorizedCode;
 							this.memorizedCode = '';
+							let retval;
 							if (memorizedCode) {
-								const lines = memorizedCode.split(this.minifier.__newLineRegExp);
+								const lines = memorizedCode.split(this.minifier.newLineRegExp);
 								const mem = {tmp: {}};
 								for (let i = 0; i < lines.length; i++) {
 									let line = lines[i];
@@ -118,16 +119,17 @@ exports.add = function add(modules) {
 										safeEval.eval(line, mem);
 									};
 								};
-								if (!block.remove) {
-									this.directives.INJECT(memorizedCode);
-								};
-								tools.forEach(mem.tmp, function(key) {
+								tools.forEach(mem.tmp, function(value, key) {
 									if (tools.indexOf(this.readOnlyVariables, key) >= 0) {
 										throw new types.Error("Variable '~0~' is reserved and it cannot be defined.", [key]);
 									};
 								}, this);
+								if (!block.remove) {
+									retval = this.directives.INJECT(memorizedCode);
+								};
 								tools.extend(this.variables, mem.tmp);
 							};
+							return retval;
 						},
 						IS_DEF: function IS_DEF(key) {
 							return types.has(this.variables, key);
@@ -159,12 +161,19 @@ exports.add = function add(modules) {
 								this.writeToken(false);
 								this.writeCode(code);
 							} else {
-								//this.variables.injectedCode = true;
-								//try {
-								this.parseCode(code, null, null, true);
-								//} finally {
-								//	this.variables.injectedCode = false;
-								//};
+								const Promise = types.getPromise();
+								return Promise.create(function(resolve, reject) {
+									const oldPrevChr = this.prevChr;
+									this.prevChr = '';
+									this.parseCode(code, null, null, true, doodad.Callback(this, function(err) {
+										if (err) {
+											reject(err);
+										} else {
+											this.prevChr = oldPrevChr;
+											resolve();
+										};
+									}));
+								}, this);
 							};
 						},
 						IF: function IF(val) {
@@ -284,9 +293,11 @@ exports.add = function add(modules) {
 							if (!block || (block.name !== 'REPLACE')) {
 								throw new types.Error("Invalid 'END_REPLACE' directive.");
 							};
+							let retval;
 							if (block.remove) {
-								this.directives.INJECT(block.code, block.raw);
+								retval = this.directives.INJECT(block.code, block.raw);
 							};
+							return retval;
 						},
 						BEGIN_REMOVE: function BEGIN_REMOVE() {
 							this.pushDirective({
@@ -322,6 +333,7 @@ exports.add = function add(modules) {
 							};
 							const memorizedCode = this.memorizedCode;
 							this.memorizedCode = '';
+							let retval;
 							if (memorizedCode && block.iter) {
 								if (this.directives.IS_DEF(block.itemName)) {
 									throw new types.Error("Variable '~0~' already defined.", [block.itemName]);
@@ -329,18 +341,22 @@ exports.add = function add(modules) {
 								if (block.keyName && this.directives.IS_DEF(block.keyName)) {
 									throw new types.Error("Variable '~0~' already defined.", [block.keyName]);
 								};
-								tools.forEach(block.iter, function(item, key) {
+								const Promise = types.getPromise();
+								retval = Promise.map(block.iter, function(item, key) {
 									this.directives.DEFINE(block.itemName, item);
 									if (block.keyName) {
 										this.directives.DEFINE(block.keyName, key);
 									};
-									this.directives.INJECT(memorizedCode);
-								}, this);
-								this.directives.UNDEFINE(block.itemName);
-								if (block.keyName) {
-									this.directives.UNDEFINE(block.keyName);
-								};
+									return this.directives.INJECT(memorizedCode);
+								}, {thisObj: this, concurrency: 1})
+									.then(function(dummy) {
+										this.directives.UNDEFINE(block.itemName);
+										if (block.keyName) {
+											this.directives.UNDEFINE(block.keyName);
+										};
+									}, null, this);
 							};
+							return retval;
 						},
 						MAP: function MAP(ar, varName) {
 							this.writeToken(false);
@@ -359,66 +375,73 @@ exports.add = function add(modules) {
 							this.memorizedCode = '';
 							const ar = block.array,
 								arLen = (ar ? ar.length : 0);
+							let retval;
 							if (memorizedCode && (arLen > 0)) {
 								if (this.directives.IS_DEF(block.varName)) {
 									throw new types.Error("Variable '~0~' already defined.", [block.varName]);
 								};
-								for (let i = 0; i < arLen; i++) {
-									if (types.has(ar, i)) {
-										this.directives.DEFINE(block.varName, ar[i]);
-										this.directives.INJECT(memorizedCode);
-										if (i < (arLen - 1)) {
-											this.directives.INJECT(',');
-										};
-									};
-								};
-								this.directives.UNDEFINE(block.varName);
+								const Promise = types.getPromise();
+								retval = Promise.map(ar, function(item, key) {
+									this.directives.DEFINE(block.varName, item);
+									return this.directives.INJECT(memorizedCode)
+										.then(function(dummy) {
+											let retval;
+											if (key < (arLen - 1)) {
+												retval = this.directives.INJECT(',');
+											};
+											return retval;
+										});
+								}, {thisObj: this, concurrency: 1})
+									.then(function(dummy) {
+										this.directives.UNDEFINE(block.varName);
+									});
 							};
+							return retval;
 						},
 					}, extenders.ExtendObject)),
 
-					__beginMemorizeDirectives: doodad.PROTECTED(doodad.ATTRIBUTE([
+					beginMemorizeDirectives: doodad.PUBLIC(doodad.ATTRIBUTE([
 						'BEGIN_DEFINE',
 						'FOR_EACH',
 						'MAP',
 					], extenders.UniqueArray)),
 
-					__endMemorizeDirectives: doodad.PROTECTED(doodad.ATTRIBUTE([
+					endMemorizeDirectives: doodad.PUBLIC(doodad.ATTRIBUTE([
 						'END_DEFINE',
 						'END_FOR',
 						'END_MAP',
 					], extenders.UniqueArray)),
 
-					__endBraceKeywords: doodad.PROTECTED(doodad.ATTRIBUTE([
+					endBraceKeywords: doodad.PUBLIC(doodad.ATTRIBUTE([
 						'else',
 						'catch',
 						'finally',
 						'until',
 					], extenders.UniqueArray)),
 
-					__keywordsFollowingDoKeyword: doodad.PROTECTED(doodad.ATTRIBUTE([
+					keywordsFollowingDoKeyword: doodad.PUBLIC(doodad.ATTRIBUTE([
 						'while',
 					], extenders.UniqueArray)),
 
-					__noSemiKeywords: doodad.PROTECTED(doodad.ATTRIBUTE([
+					noSemiKeywords: doodad.PUBLIC(doodad.ATTRIBUTE([
 						'var',
 						'let',
 						'const',
 					], extenders.UniqueArray)),
 
-					__acceptRegExpKeywords: doodad.PROTECTED(doodad.ATTRIBUTE([
+					acceptRegExpKeywords: doodad.PUBLIC(doodad.ATTRIBUTE([
 						'return',
 						'yield',
 					], extenders.UniqueArray)),
 
-					__newLineChars: doodad.PROTECTED(doodad.ATTRIBUTE([
+					newLineChars: doodad.PUBLIC(doodad.ATTRIBUTE([
 						'\n',
 						'\r',
 						'\u2028',
 						'\u2029',
 					], extenders.UniqueArray)),
 
-					__newLineRegExp: doodad.PROTECTED(/\n|\r|\u2028|\u2029/g),
+					newLineRegExp: doodad.PUBLIC(/\n|\r|\u2028|\u2029/g),
 
 					setOptions: doodad.OVERRIDE(function setOptions(options) {
 						types.getDefault(options, 'runDirectives', types.getIn(this.options, 'runDirectives', false));
@@ -436,7 +459,6 @@ exports.add = function add(modules) {
 							options: this.options,
 							variables: {},
 							directives: {},
-							//readOnlyVariables: ['injectedCode'],
 							readOnlyVariables: [],
 
 							isComment: false,
@@ -454,7 +476,7 @@ exports.add = function add(modules) {
 							prevChr: '',
 
 							token: '',
-							hasSep: true, //false,
+							hasSep: true,
 							sep: '',
 							explicitSep: false,
 							newLine: false,
@@ -570,38 +592,44 @@ exports.add = function add(modules) {
 								this.hasSep = true;
 							},
 							runDirective: function runDirective(directive) {
+								let retval;
 								if (this.options.runDirectives) {
 									directive = tools.trim(directive.replace(/^\s*/, ''));
 									if (directive) {
 										const name = tools.split(directive, '(', 2)[0].trim();
-										if (tools.indexOf(this.minifier.__endMemorizeDirectives, name) >= 0) {
+										if (tools.indexOf(this.minifier.endMemorizeDirectives, name) >= 0) {
 											this.writeToken(false);
 											this.memorize--;
 										};
 										if (this.memorize === 0) {
 											try {
-												safeEval.eval(directive, this.directives, null, {allowRegExp: true});
+												retval = safeEval.eval(directive, this.directives, null, {allowRegExp: true, allowFunctions: true});
 											} catch(ex) {
 												throw new types.ParseError("The directive '~0~' has failed to execute : ~1~", [directive, ex.stack]);
 											};
 										} else {
 											this.memorizedCode += '/*!' + directive + '*/';
 										};
-										if (tools.indexOf(this.minifier.__beginMemorizeDirectives, name) >= 0) {
+										if (tools.indexOf(this.minifier.beginMemorizeDirectives, name) >= 0) {
 											this.memorize++;
 										};
 									};
 								};
+								return retval;
 							},
 
-							parseCode: function(code, /*optional*/start, /*optional*/end, /*optional*/eof) {
+							parseCode: function(code, /*optional*/start, /*optional*/end, /*optional*/eof, /*optional*/callback) {
 								const curLocale = locale.getCurrent();
-
-								code = (this.prevChr || '') + (code || '');
-								this.prevChr = '';
 
 								this.index = (types.isNothing(start) ? 0 : _shared.Natives.mathMax(start, 0));
 								end = (types.isNothing(end) ? code.length : _shared.Natives.mathMin(end, code.length));
+
+								if (this.prevChr) {
+									code = this.prevChr + code.slice(this.index, end);
+									this.index = 0;
+									end = code.length;
+									this.prevChr = '';
+								};
 
 								analyseChunk: while (this.index < end) {
 									let chr = unicode.nextChar(code, this.index, end);
@@ -617,7 +645,23 @@ exports.add = function add(modules) {
 												const directive = this.directive;
 												this.directive = '';
 												if (directive) {
-													this.runDirective(directive);
+													const retval = this.runDirective(directive);
+													if (types.isPromise(retval)) {
+														// Wait for directive to execute.
+														const oldEof = eof,
+															oldCb = callback,
+															oldChr = chr;
+														eof = false;
+														callback = null;
+														retval.nodeify(function(err, dummy) {
+															if (err) {
+																oldCb(err);
+															} else {
+																this.parseCode(code, oldChr.index + oldChr.size, end, oldEof, oldCb);
+															};
+														}, this);
+														break analyseChunk;
+													};
 												};
 												this.index = chr.index + chr.size;
 												continue analyseChunk;
@@ -628,7 +672,7 @@ exports.add = function add(modules) {
 											} else if (this.isDirectiveBlock && (chr.chr === '*')) {
 												// Wait next char
 												this.prevChr = chr.chr;
-											} else if (tools.indexOf(this.minifier.__newLineChars, chr.chr) >= 0) {
+											} else if (tools.indexOf(this.minifier.newLineChars, chr.chr) >= 0) {
 												this.prevChr = '';
 												this.isDirective = false;
 												const isDirectiveBlock = this.isDirectiveBlock;
@@ -636,7 +680,26 @@ exports.add = function add(modules) {
 												const directive = this.directive;
 												this.directive = '';
 												if (directive) {
-													this.runDirective(directive);
+													const retval = this.runDirective(directive);
+													if (types.isPromise(retval)) {
+														// Wait for directive to execute.
+														const oldEof = eof,
+															oldCb = callback,
+															oldChr = chr;
+														eof = false;
+														callback = null;
+														retval.nodeify(function(err, dummy) {
+															if (err) {
+																oldCb(err);
+															} else {
+																if (isDirectiveBlock) {
+																	this.isDirectiveBlock = true;
+																};
+																this.parseCode(code, oldChr.index + oldChr.size, end, oldEof, oldCb);
+															};
+														}, this);
+														break analyseChunk;
+													};
 												};
 												if (isDirectiveBlock) {
 													this.isDirectiveBlock = true;
@@ -656,7 +719,7 @@ exports.add = function add(modules) {
 												// Incomplete Unicode sequence
 												break analyseChunk;
 											};
-											if (tools.indexOf(this.minifier.__newLineChars, chr.chr) >= 0) {
+											if (tools.indexOf(this.minifier.newLineChars, chr.chr) >= 0) {
 												this.isComment = false;
 												if (this.options.keepComments) {
 													this.writeToken(false);
@@ -711,7 +774,7 @@ exports.add = function add(modules) {
 												// Incomplete Unicode sequence
 												break analyseChunk;
 											};
-											if (this.isString && (tools.indexOf(this.minifier.__newLineChars, chr.chr) >= 0)) {
+											if (this.isString && (tools.indexOf(this.minifier.newLineChars, chr.chr) >= 0)) {
 												// NOTE: "new line" can be "\r\n" or "\n\r", so there is no condition on "this.isEscaped"
 												// Multi-Line String. New line is removed. It assumes new line is escaped because otherwise it is a synthax error.
 												// Exemple :
@@ -887,7 +950,7 @@ exports.add = function add(modules) {
 															chr = chr.nextChar();
 															break doSpaces;
 														};
-													} else if (tools.indexOf(this.minifier.__newLineChars, chr.chr) >= 0) { // New line
+													} else if (tools.indexOf(this.minifier.newLineChars, chr.chr) >= 0) { // New line
 														hasNewLine = true;
 													} else { // Other {space}
 														hasSpace = true;
@@ -953,7 +1016,7 @@ exports.add = function add(modules) {
 												} else if (token === 'do') {
 													this.isDo = true;
 												} else {
-													if (this.endBrace && ((this.sep === ' ') || (this.minifier.__endBraceKeywords.indexOf(token) >= 0) || (this.isDo && (this.minifier.__keywordsFollowingDoKeyword.indexOf(token) >= 0)))) {
+													if (this.endBrace && ((this.sep === ' ') || (this.minifier.endBraceKeywords.indexOf(token) >= 0) || (this.isDo && (this.minifier.keywordsFollowingDoKeyword.indexOf(token) >= 0)))) {
 														this.hasSep = true;
 													};
 													this.isDo = false;
@@ -963,7 +1026,7 @@ exports.add = function add(modules) {
 													if (this.token || this.explicitSep) {
 														this.hasSep = false;
 													};
-													if (this.minifier.__noSemiKeywords.indexOf(this.token) >= 0) {
+													if (this.minifier.noSemiKeywords.indexOf(this.token) >= 0) {
 														this.sep = ' ';
 													} else if (this.newLine) {
 														this.sep = ';';
@@ -971,7 +1034,7 @@ exports.add = function add(modules) {
 													this.writeToken(false); // write current token and separator
 												};
 												this.token = token;
-												this.ignoreRegExp = (token && (this.minifier.__acceptRegExpKeywords.indexOf(token) < 0));
+												this.ignoreRegExp = (token && (this.minifier.acceptRegExpKeywords.indexOf(token) < 0));
 												continue nextChar;
 											} else if ((chr.codePoint === 123) || (chr.codePoint === 40) || (chr.codePoint === 91)) { // "{", "(", "["
 												if (this.sep !== ';') {
@@ -1029,6 +1092,44 @@ exports.add = function add(modules) {
 									};
 								};
 
+								const onEnd = function(err, dummy) {
+									if (!err && eof) {
+										if (this.isCommentBlock) {
+											throw new types.Error("A comments block is still opened at EOF.");
+										};
+
+										if (this.isString) {
+											throw new types.Error("A string is still opened at EOF.");
+										};
+
+										if (this.isTemplateExpression) {
+											throw new types.Error("A template expression is still opened at EOF.");
+										};
+
+										if (this.isTemplate) {
+											throw new types.Error("A template is still opened at EOF.");
+										};
+
+										if (this.isRegExp) {
+											throw new types.Error("A regular expression is still opened at EOF.");
+										};
+
+										const prevChr = this.prevChr;
+										this.prevChr = '';
+										if (this.explicitSep || this.newLine) {
+											this.hasSep = false;
+										};
+										this.writeToken(false);
+										if (prevChr) {
+											this.writeCode(prevChr);
+										};
+									};
+
+									if (callback) {
+										callback(err);
+									};
+								};
+
 								if (eof) {
 									if (this.isDirectiveBlock) {
 										throw new types.Error("A directives block is still opened at EOF.");
@@ -1040,40 +1141,16 @@ exports.add = function add(modules) {
 										const directive = this.directive;
 										this.directive = '';
 										if (directive) {
-											this.runDirective(directive);
+											const retval = this.runDirective(directive);
+											if (types.isPromise(retval)) {
+												retval.nodeify(onEnd, this);
+												return;
+											};
 										};
 									};
-
-									if (this.isCommentBlock) {
-										throw new types.Error("A comments block is still opened at EOF.");
-									};
-
-									if (this.isString) {
-										throw new types.Error("A string is still opened at EOF.");
-									};
-
-									if (this.isTemplateExpression) {
-										throw new types.Error("A template expression is still opened at EOF.");
-									};
-
-									if (this.isTemplate) {
-										throw new types.Error("A template is still opened at EOF.");
-									};
-
-									if (this.isRegExp) {
-										throw new types.Error("A regular expression is still opened at EOF.");
-									};
-
-									const prevChr = this.prevChr;
-									this.prevChr = '';
-									if (this.explicitSep || this.newLine) {
-										this.hasSep = false;
-									};
-									this.writeToken(false);
-									if (prevChr) {
-										this.writeCode(prevChr);
-									};
 								};
+
+								onEnd.call(this, null, null);
 							},
 						};
 
@@ -1117,17 +1194,29 @@ exports.add = function add(modules) {
 
 						const eof = (data.raw === io.EOF);
 
-						minifierState.parseCode(data.toString(), null, null, eof); // sync
+						const deferCb1 = data.defer(),
+							deferCb2 = data.defer();
 
-						if (minifierState.buffer) {
-							this.submit(new io.TextData(minifierState.buffer), {callback: data.defer()});
-							minifierState.buffer = '';
-						};
+						minifierState.parseCode(data.toString(), null, null, eof, doodad.Callback(this, function(err) {
+							if (err) {
+								deferCb1(err);
+								//deferCb2(err);
+							} else {
+								if (minifierState.buffer) {
+									this.submit(new io.TextData(minifierState.buffer), {callback: deferCb1});
+									minifierState.buffer = '';
+								} else {
+									deferCb1();
+								};
 
-						if (eof) {
-							this.__clearState();
-							this.submit(new io.TextData(io.EOF), {callback: data.defer()});
-						};
+								if (eof) {
+									this.__clearState();
+									this.submit(new io.TextData(io.EOF), {callback: deferCb2});
+								} else {
+									deferCb2();
+								};
+							};
+						}));
 
 						return retval;
 					}),
