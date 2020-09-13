@@ -169,7 +169,7 @@ exports.add = function add(modules) {
 							return tools.toSource(val, {depth});
 						},
 						INJECT: function INJECT(code, /*optional*/raw) {
-							const state = this.__state;
+							//const state = this.__state;
 							code = types.toString(code);
 							if (raw) {
 								this.writeToken(false);
