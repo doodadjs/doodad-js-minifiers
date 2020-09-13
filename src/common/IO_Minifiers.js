@@ -177,13 +177,13 @@ exports.add = function add(modules) {
 							} else {
 								const Promise = types.getPromise();
 								return Promise.create(function(resolve, reject) {
-									const oldPrevChr = state.prevChr;
-									state.prevChr = '';
-									this.parseCode(code, 0, true, doodad.Callback(this, function(err) {
+									//const oldPrevChr = state.prevChr;
+									//state.prevChr = '';
+									this.parseCode(code, 0, false, true, doodad.Callback(this, function(err) {
 										if (err) {
 											reject(err);
 										} else {
-											state.prevChr = oldPrevChr;
+											//state.prevChr = oldPrevChr;
 											resolve();
 										};
 									}));
@@ -622,7 +622,7 @@ exports.add = function add(modules) {
 						return retval;
 					}),
 
-					parseCode: doodad.PROTECTED(function(code, start, eof, /*optional*/callback) {
+					parseCode: doodad.PROTECTED(function parseCode(code, start, eof, forceWrite, callback) {
 						const state = this.__state;
 						const curLocale = locale.getCurrent();
 
@@ -635,6 +635,8 @@ exports.add = function add(modules) {
 						};
 
 						const end = code.length;
+
+						let deferredEnd = false;
 
 						analyseChunk: while (state.index < end) {
 							let chr = unicode.nextChar(code, state.index, end);
@@ -653,16 +655,13 @@ exports.add = function add(modules) {
 											const retval = this.runDirective(directive);
 											if (types.isPromise(retval)) {
 												// Wait for directive to execute.
-												const oldEof = eof,
-													oldCb = callback,
-													oldChr = chr;
-												eof = false;
-												callback = null;
+												const oldChr = chr;
+												deferredEnd = true;
 												retval.nodeify(function(err, dummy) {
 													if (err) {
-														oldCb(err);
+														callback(err);
 													} else {
-														this.parseCode(code, oldChr.index + oldChr.size, oldEof, oldCb);
+														this.parseCode(code, oldChr.index + oldChr.size, eof, forceWrite, callback);
 													};
 												}, this);
 												break analyseChunk;
@@ -688,19 +687,16 @@ exports.add = function add(modules) {
 											const retval = this.runDirective(directive);
 											if (types.isPromise(retval)) {
 												// Wait for directive to execute.
-												const oldEof = eof,
-													oldCb = callback,
-													oldChr = chr;
-												eof = false;
-												callback = null;
+												const oldChr = chr;
+												deferredEnd = true;
 												retval.nodeify(function(err, dummy) {
 													if (err) {
-														oldCb(err);
+														callback(err);
 													} else {
 														if (isDirectiveBlock) {
 															state.isDirectiveBlock = true;
 														};
-														this.parseCode(code, oldChr.index + oldChr.size, oldEof, oldCb);
+														this.parseCode(code, oldChr.index + oldChr.size, eof, forceWrite, callback);
 													};
 												}, this);
 												break analyseChunk;
@@ -1119,6 +1115,16 @@ exports.add = function add(modules) {
 									throw new types.Error("A regular expression is still opened at EOF.");
 								};
 
+								if (state.isForArguments || state.isFor) {
+									throw new types.Error("A for statement is still opened at EOF.");
+								};
+
+								if (state.levelStack.length > 0) {
+									throw new types.Error("A '$0' is still opened at EOF.", [state.levelStack[state.levelStack.length - 1].name]);
+								};
+							};
+
+							if (eof || forceWrite) {
 								const prevChr = state.prevChr;
 								state.prevChr = '';
 								if (state.explicitSep || state.newLine) {
@@ -1130,32 +1136,32 @@ exports.add = function add(modules) {
 								};
 							};
 
-							if (callback) {
-								callback(err);
-							};
+							callback(err);
 						};
 
-						if (eof) {
-							if (state.isDirectiveBlock) {
-								throw new types.Error("A directives block is still opened at EOF.");
-							};
+						if (!deferredEnd) {
+							if (eof) {
+								if (state.isDirectiveBlock) {
+									throw new types.Error("A directives block is still opened at EOF.");
+								};
 
-							if (state.isDirective) {
-								state.prevChr = '';
-								state.isDirective = false;
-								const directive = state.directive;
-								state.directive = '';
-								if (directive) {
-									const retval = this.runDirective(directive);
-									if (types.isPromise(retval)) {
-										retval.nodeify(onEnd, this);
-										return;
+								if (state.isDirective) {
+									state.prevChr = '';
+									state.isDirective = false;
+									const directive = state.directive;
+									state.directive = '';
+									if (directive) {
+										const retval = this.runDirective(directive);
+										if (types.isPromise(retval)) {
+											retval.nodeify(onEnd, this);
+											return;
+										};
 									};
 								};
 							};
-						};
 
-						onEnd.call(this, null, null);
+							onEnd.call(this, null, null);
+						};
 					}),
 
 					__clearState: doodad.PROTECTED(function() {
@@ -1249,7 +1255,7 @@ exports.add = function add(modules) {
 						const deferCb1 = data.defer(),
 							deferCb2 = data.defer();
 
-						this.parseCode(data.toString(), 0, eof, doodad.Callback(this, function(err) {
+						this.parseCode(data.toString(), 0, eof, false, doodad.Callback(this, function(err) {
 							if (err) {
 								deferCb1(err);
 								//deferCb2(err);
