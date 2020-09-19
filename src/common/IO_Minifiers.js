@@ -179,7 +179,7 @@ exports.add = function add(modules) {
 								return Promise.create(function(resolve, reject) {
 									//const oldPrevChr = state.prevChr;
 									//state.prevChr = '';
-									this.parseCode(code, 0, false, true, doodad.Callback(this, function(err) {
+									this.parseCode(code, 0, false, doodad.Callback(this, function(err) {
 										if (err) {
 											reject(err);
 										} else {
@@ -622,7 +622,7 @@ exports.add = function add(modules) {
 						return retval;
 					}),
 
-					parseCode: doodad.PROTECTED(function parseCode(code, start, eof, forceWrite, callback) {
+					parseCode: doodad.PROTECTED(function parseCode(code, start, eof, callback) {
 						const state = this.__state;
 						const curLocale = locale.getCurrent();
 
@@ -661,7 +661,7 @@ exports.add = function add(modules) {
 													if (err) {
 														callback(err);
 													} else {
-														this.parseCode(code, oldChr.index + oldChr.size, eof, forceWrite, callback);
+														this.parseCode(code, oldChr.index + oldChr.size, eof, callback);
 													};
 												}, this);
 												break analyseChunk;
@@ -696,7 +696,7 @@ exports.add = function add(modules) {
 														if (isDirectiveBlock) {
 															state.isDirectiveBlock = true;
 														};
-														this.parseCode(code, oldChr.index + oldChr.size, eof, forceWrite, callback);
+														this.parseCode(code, oldChr.index + oldChr.size, eof, callback);
 													};
 												}, this);
 												break analyseChunk;
@@ -1122,9 +1122,7 @@ exports.add = function add(modules) {
 								if (state.levelStack.length > 0) {
 									throw new types.Error("A '$0' is still opened at EOF.", [state.levelStack[state.levelStack.length - 1].name]);
 								};
-							};
 
-							if (eof || forceWrite) {
 								const prevChr = state.prevChr;
 								state.prevChr = '';
 								if (state.explicitSep || state.newLine) {
@@ -1255,7 +1253,7 @@ exports.add = function add(modules) {
 						const deferCb1 = data.defer(),
 							deferCb2 = data.defer();
 
-						this.parseCode(data.toString(), 0, eof, false, doodad.Callback(this, function(err) {
+						this.parseCode(data.toString(), 0, eof, doodad.Callback(this, function(err) {
 							if (err) {
 								deferCb1(err);
 								//deferCb2(err);
